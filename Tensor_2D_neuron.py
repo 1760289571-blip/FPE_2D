@@ -189,7 +189,7 @@ version of explicit integral for three types of RBF function
 @jit
 def gaussian_integral(sigma, shift):
     sigma_t =  1/ (5e-03 + jnp.square(sigma) )
-    results = 0.5 * ( jax.lax.erf( jnp.sqrt(sigma_t/2) * (r + shift) ) - jax.lax.erf( jnp.sqrt(sigma_t/2) * (-r + shift) ) )
+    results = 0.5 * ( jax.lax.erf( jnp.sqrt(sigma_t/2) * (r - shift) ) - jax.lax.erf( jnp.sqrt(sigma_t/2) * (-r - shift) ) )
     return results
 
 #inverse quadratic integral:
