@@ -188,7 +188,7 @@ version of explicit integral for three types of RBF function
 #gaussian integral
 @jit
 def gaussian_integral(sigma, shift):
-    sigma_t =  1/ (5e-03 + jnp.square(sigma) )
+    sigma_t =  1/ (scale_bound["gaussian"] + jnp.square(sigma) )
     results = 0.5 * ( jax.lax.erf( jnp.sqrt(sigma_t/2) * (r - shift) ) - jax.lax.erf( jnp.sqrt(sigma_t/2) * (-r - shift) ) )
     return results
 
@@ -212,7 +212,7 @@ def gaussian_1_test(sigma, data, shift):
 
     input = data - shift
     Integral_scaling = gaussian_integral(sigma, shift)
-    sigma_t =  1/ (5e-03 + jnp.square(sigma) )
+    sigma_t =  1/ (scale_bound["gaussian"] + jnp.square(sigma) )
     dim_each_result = (1/Integral_scaling) * ( jnp.sqrt(sigma_t)/jnp.sqrt(2 * np.pi) ) * jnp.exp( -0.5 * sigma_t * jnp.square(input))
 
     return dim_each_result
@@ -247,7 +247,7 @@ def gaussian_1(sigma, data, shift):
     input = data - shift
     Integral_scaling = gaussian_integral(sigma, shift)
 
-    sigma_t =  1/ (5e-03 + jnp.square(sigma) )
+    sigma_t =  1/ (scale_bound["gaussian"] + jnp.square(sigma) )
 
     dim_each_result = (1/Integral_scaling) * ( jnp.sqrt(sigma_t)/jnp.sqrt(2 * np.pi) ) * jnp.exp( -0.5 * sigma_t * jnp.square(input))
     #grad_dim_each_result = (1/Integral_scaling) * (-sigma_t * input * dim_each_result)
