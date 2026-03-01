@@ -26,7 +26,7 @@ import sys
 parser = argparse.ArgumentParser(description='TRBFN Training for FKP Equaions')
 
 parser.add_argument('--test_case', type=str, default="FPE")
-parser.add_argument('--Chosen_List', type=list, default= ["gaussian", "wendland", "wendland"])
+parser.add_argument('--Chosen_List', type=list, default= ["gaussian", "gaussian","gaussian"])
 parser.add_argument('--rank', type = dict, default = 128)
 parser.add_argument('--rbf_types', type = str, default = "three_one", help = "three_one/two")
 parser.add_argument('--epochs', type = int, default = 50000)
@@ -37,11 +37,11 @@ parser.add_argument('--scale_r', type = float, default = 1.0)
 parser.add_argument('--r_sde', type = float, default = 20)
 parser.add_argument('--I', type = float, default = 0)
 parser.add_argument('--V_thres', type = float, default = 20)
-parser.add_argument('--tau_r', type = float, default = 0.002)
+parser.add_argument('--tau_r', type = float, default = 0)
 parser.add_argument('--tau_m', type = float, default = 0.02)
 parser.add_argument('--V_reset', type = float, default = 0)
 parser.add_argument('--sigma', type = float, default = 2)
-parser.add_argument('--c', type = float, default = 0.8)
+parser.add_argument('--c', type = float, default = 0.5)
 args = parser.parse_args()
 
 '''
@@ -62,9 +62,9 @@ need to be modified for our version
 '''
 v_g = lambda data: 0.1 * (data[2]**2) * (data[3]**2) * (3.4 * (data[2] + data[3])) - 0.2 * data[2] * data[3] * (data[2] + data[3])
 
-func_into = (lambda data,I,tau_m: - jnp.asarray(
-        [-(data[0]+I)/tau_m,  
-         -(data[1]+I)/tau_m
+func_into = (lambda data,I,tau_m: jnp.asarray(
+        [(-data[0]+I)/tau_m,  
+         (-data[1]+I)/tau_m
         ]
     )
     )
@@ -238,6 +238,19 @@ def wendland_1_test(h, data, shift_w):
     input = data - shift_
     dim_each_result = 1.25 * h_sq * jnp.power(jax.nn.relu(1 - jnp.abs(h_sq * input)) , 3) * ( 3.0 * jnp.abs(h_sq * input) + 1 )
     return dim_each_result
+    
+def wendland_1_test2(h, data, shift_w):
+    shift_ = shift_w
+
+    #h_deno = 3e-02 + jnp.abs( (r - jnp.abs(shift_)) * jnp.tanh(h) )
+
+    h_deno = jnp.abs(h)
+
+    h_sq = 1/h_deno
+
+    input = data - shift_
+    dim_each_result = 1.25 * h_sq * jnp.power(jax.nn.relu(1 - jnp.abs(h_sq * input)) , 3) * ( 3.0 * jnp.abs(h_sq * input) + 1 )
+    return dim_each_result
 
 '''
 RBF derivatives and functions for PINN loss function
@@ -290,18 +303,22 @@ def wendland_1(h, data, shift_w):
     return dim_each_result, grad_dim_each_result, hessian_dim_each_result
 
 def gaussian_conv(h,data,s,Sigma):
-    b1=data-I*(1-jnp.exp(-tau_r/tau_m))
-    b2=-jnp.exp(-tau_r/tau_m)
-    return (jnp.sqrt(2)*jnp.sqrt(jnp.pi)*jnp.exp(-jnp.square(b1 + b2*s)/(jnp.square(b2*h) + 2*Sigma))*(jax.lax.erf((jnp.sqrt(2)*(r*jnp.square(b2*h) + b1*b2*jnp.square(h) + r*Sigma*2 - s*Sigma*2))/(2*jnp.square(h)*Sigma*jnp.sqrt((jnp.square(b2*h) + 2*Sigma)/(jnp.square(h)*Sigma)))) + jax.lax.erf((jnp.sqrt(2)*(r*jnp.square(b2)*jnp.square(h) - b1*b2*jnp.square(h) + r*Sigma*2 + s*Sigma*2))/(2*jnp.square(h)*Sigma*jnp.sqrt((jnp.square(b2*h) + 2*Sigma)/(jnp.square(h)*Sigma))))))/(2*jnp.sqrt((jnp.square(b2*h) + 2*Sigma)/(jnp.square(h)*Sigma)))
-
-    
-def wendland_conv(h,data,s,Sigma): # calculate integral involved in reset dynamics
     os.environ['JAX_DEFAULT_DTYPE_BITS'] = '128'
     b1=data-I*(1-jnp.exp(-tau_r/tau_m))
     b2=-jnp.exp(-tau_r/tau_m)
-    simp_f=(Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)**2)/(b2**2*h**3) + (3*Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)**3)/(b2**2*h**4)- (2*s**2*Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma)))/(b2**2*h**3)     - (Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 - 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 - 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3)- (Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 + 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 + 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3)
+    Integral_scaling = gaussian_integral(h, s)
+    sigma_t =  1/ (scale_bound["gaussian"] + jnp.square(h) )
+    simp_f = (jnp.sqrt(sigma_t)* jnp.exp(-(sigma_t * (b1 + b2 * s) ** 2) / (2 * b2**2 + 2 * Sigma * sigma_t))* (jax.lax.erf((jnp.sqrt(2)* (r * b2**2 - b1 * b2 + r * Sigma * sigma_t + Sigma * s * sigma_t)) / (2 * Sigma * jnp.sqrt((b2**2 + Sigma * sigma_t) / Sigma))) + jax.lax.erf((jnp.sqrt(2) * (r * b2**2 + b1 * b2 + r * Sigma * sigma_t - Sigma * s * sigma_t)) / (2 * Sigma * jnp.sqrt((b2**2 + Sigma * sigma_t) / Sigma)))) / (2 * jnp.sqrt((b2**2 + Sigma * sigma_t) / Sigma)))
     os.environ['JAX_DEFAULT_DTYPE_BITS'] = '32'
-    return simp_f
+    return 1/Integral_scaling*simp_f
+
+    
+def wendland_conv(h,data,s,Sigma): # calculate integral involved in reset dynamics
+    b1=data-I*(1-jnp.exp(-tau_r/tau_m))
+    b2=-jnp.exp(-tau_r/tau_m)
+    h = scale_bound["wendland"] + jnp.abs(h)
+    simp_f= (Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(h - s)**2)/(b2**2*h**3) + (3*Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(h - s)**3)/(b2**2*h**4) + (3*Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**3 + 3*b1**2*b2*h + 4*b1**2*b2*s + 3*b1*b2**2*h**2 + 9*b1*b2**2*h*s + 6*b1*b2**2*s**2 + 5*Sigma*b1 + b2**3*h**3 + 6*b2**3*h**2*s + 9*b2**3*h*s**2 + 4*b2**3*s**3 + 6*Sigma*b2*h + 8*Sigma*b2*s))/(b2**5*h**4) - (3*Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**3 - 3*b1**2*b2*h + 4*b1**2*b2*s + 3*b1*b2**2*h**2 - 9*b1*b2**2*h*s + 6*b1*b2**2*s**2 + 5*Sigma*b1 - b2**3*h**3 + 6*b2**3*h**2*s - 9*b2**3*h*s**2 + 4*b2**3*s**3 - 6*Sigma*b2*h + 8*Sigma*b2*s))/(b2**5*h**4) + (Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)**2)/(b2**2*h**3) + (3*Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)**3)/(b2**2*h**4) - (Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 - 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 - 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3) - (Sigma*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 + 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 + 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3) - (2*Sigma*s**2*jnp.exp(-(b1 + b2*s)**2/(2*Sigma)))/(b2**2*h**3) - (3*Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(b1**3 + 3*b1**2*b2*h + 4*b1**2*b2*s + 3*b1*b2**2*h**2 + 9*b1*b2**2*h*s + 6*b1*b2**2*s**2 + 5*Sigma*b1 + b2**3*h**3 + 6*b2**3*h**2*s + 9*b2**3*h*s**2 + 4*b2**3*s**3 + 6*Sigma*b2*h + 8*Sigma*b2*s))/(b2**5*h**4) + (3*Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(b1**3 - 3*b1**2*b2*h + 4*b1**2*b2*s + 3*b1*b2**2*h**2 - 9*b1*b2**2*h*s + 6*b1*b2**2*s**2 + 5*Sigma*b1 - b2**3*h**3 + 6*b2**3*h**2*s - 9*b2**3*h*s**2 + 4*b2**3*s**3 - 6*Sigma*b2*h + 8*Sigma*b2*s))/(b2**5*h**4) + (Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(b1**2 + 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 + 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3) + (Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(b1**2 - 3*b1*b2*h + 3*b1*b2*s + 3*b2**2*h**2 - 6*b2**2*h*s + 3*b2**2*s**2 + 2*Sigma))/(b2**4*h**3) + (3*Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)*(b1**2 + 3*b1*b2*h + 4*b1*b2*s + 3*b2**2*h**2 + 9*b2**2*h*s + 6*b2**2*s**2 + 3*Sigma))/(b2**4*h**4) + (3*Sigma*s*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 - 3*b1*b2*h + 4*b1*b2*s + 3*b2**2*h**2 - 9*b2**2*h*s + 6*b2**2*s**2 + 3*Sigma))/(b2**4*h**4) - (3*Sigma*s*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1**2 + 3*b1*b2*h + 4*b1*b2*s + 3*b2**2*h**2 + 9*b2**2*h*s + 6*b2**2*s**2 + 3*Sigma))/(b2**4*h**4) + (3*Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(h - s)**2*(b1 - 3*b2*h + 4*b2*s))/(b2**3*h**4) - (Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)*(b1 + 3*b2*h + 3*b2*s))/(b2**3*h**3) + (3*Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(h - s)*(b1**2 - 3*b1*b2*h + 4*b1*b2*s + 3*b2**2*h**2 - 9*b2**2*h*s + 6*b2**2*s**2 + 3*Sigma))/(b2**4*h**4) + (Sigma*s*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1 - 3*b2*h + 3*b2*s))/(b2**3*h**3) + (Sigma*s*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1 + 3*b2*h + 3*b2*s))/(b2**3*h**3) + (Sigma*jnp.exp(-(b1 - b2*h + b2*s)**2/(2*Sigma))*(h - s)*(b1 - 3*b2*h + 3*b2*s))/(b2**3*h**3) - (3*Sigma*jnp.exp(-(b1 + b2*h + b2*s)**2/(2*Sigma))*(h + s)**2*(b1 + 3*b2*h + 4*b2*s))/(b2**3*h**4) - (3*Sigma*s**2*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1 - 3*b2*h + 4*b2*s))/(b2**3*h**4) + (3*Sigma*s**2*jnp.exp(-(b1 + b2*s)**2/(2*Sigma))*(b1 + 3*b2*h + 4*b2*s))/(b2**3*h**4) + (3*jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*s)/jnp.sqrt(2*Sigma))*(3*Sigma**2 + 6*Sigma*b1**2 + 9*Sigma*b1*b2*h + 12*Sigma*b1*b2*s + 3*Sigma*b2**2*h**2 + 9*Sigma*b2**2*h*s + 6*Sigma*b2**2*s**2 + b1**4 + 3*b1**3*b2*h + 4*b1**3*b2*s + 3*b1**2*b2**2*h**2 + 9*b1**2*b2**2*h*s + 6*b1**2*b2**2*s**2 + b1*b2**3*h**3 + 6*b1*b2**3*h**2*s + 9*b1*b2**3*h*s**2 + 4*b1*b2**3*s**3 + b2**4*h**3*s + 3*b2**4*h**2*s**2 + 3*b2**4*h*s**3 + b2**4*s**4))/(2*b2**5*h**4) - (3*jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*s)/jnp.sqrt(2*Sigma))*(3*Sigma**2 + 6*Sigma*b1**2 - 9*Sigma*b1*b2*h + 12*Sigma*b1*b2*s + 3*Sigma*b2**2*h**2 - 9*Sigma*b2**2*h*s + 6*Sigma*b2**2*s**2 + b1**4 - 3*b1**3*b2*h + 4*b1**3*b2*s + 3*b1**2*b2**2*h**2 - 9*b1**2*b2**2*h*s + 6*b1**2*b2**2*s**2 - b1*b2**3*h**3 + 6*b1*b2**3*h**2*s - 9*b1*b2**3*h*s**2 + 4*b1*b2**3*s**3 - b2**4*h**3*s + 3*b2**4*h**2*s**2 - 3*b2**4*h*s**3 + b2**4*s**4))/(2*b2**5*h**4) - (3*jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*h + b2*s)/jnp.sqrt(2*Sigma))*(3*Sigma**2 + 6*Sigma*b1**2 + 9*Sigma*b1*b2*h + 12*Sigma*b1*b2*s + 3*Sigma*b2**2*h**2 + 9*Sigma*b2**2*h*s + 6*Sigma*b2**2*s**2 + b1**4 + 3*b1**3*b2*h + 4*b1**3*b2*s + 3*b1**2*b2**2*h**2 + 9*b1**2*b2**2*h*s + 6*b1**2*b2**2*s**2 + b1*b2**3*h**3 + 6*b1*b2**3*h**2*s + 9*b1*b2**3*h*s**2 + 4*b1*b2**3*s**3 + b2**4*h**3*s + 3*b2**4*h**2*s**2 + 3*b2**4*h*s**3 + b2**4*s**4))/(2*b2**5*h**4) + (3*jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 - b2*h + b2*s)/jnp.sqrt(2*Sigma))*(3*Sigma**2 + 6*Sigma*b1**2 - 9*Sigma*b1*b2*h + 12*Sigma*b1*b2*s + 3*Sigma*b2**2*h**2 - 9*Sigma*b2**2*h*s + 6*Sigma*b2**2*s**2 + b1**4 - 3*b1**3*b2*h + 4*b1**3*b2*s + 3*b1**2*b2**2*h**2 - 9*b1**2*b2**2*h*s + 6*b1**2*b2**2*s**2 - b1*b2**3*h**3 + 6*b1*b2**3*h**2*s - 9*b1*b2**3*h*s**2 + 4*b1*b2**3*s**3 - b2**4*h**3*s + 3*b2**4*h**2*s**2 - 3*b2**4*h*s**3 + b2**4*s**4))/(2*b2**5*h**4) + (jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*h + b2*s)/jnp.sqrt(2*Sigma))*(b1 + b2*h + b2*s)*(b1**2 + 2*b1*b2*h + 2*b1*b2*s + b2**2*h**2 + 2*b2**2*h*s + b2**2*s**2 + 3*Sigma))/(2*b2**4*h**3) + (jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 - b2*h + b2*s)/jnp.sqrt(2*Sigma))*(b1 - b2*h + b2*s)*(b1**2 - 2*b1*b2*h + 2*b1*b2*s + b2**2*h**2 - 2*b2**2*h*s + b2**2*s**2 + 3*Sigma))/(2*b2**4*h**3) - (jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*s)/jnp.sqrt(2*Sigma))*(b1 + b2*h + b2*s)*(b1**2 + 2*b1*b2*h + 2*b1*b2*s + b2**2*h**2 + 2*b2**2*h*s + b2**2*s**2 + 3*Sigma))/(2*b2**4*h**3) - (jnp.sqrt(2*jnp.pi*Sigma)*jax.lax.erf((b1 + b2*s)/jnp.sqrt(2*Sigma))*(b1 - b2*h + b2*s)*(b1**2 - 2*b1*b2*h + 2*b1*b2*s + b2**2*h**2 - 2*b2**2*h*s + b2**2*s**2 + 3*Sigma))/(2*b2**4*h**3)
+    return 1.25*simp_f
 '''
 def wendland_conv(h,data,s,Sigma): # calculate integral involved in reset dynamics
     b1=data-I*(1-jnp.exp(-tau_r/tau_m))
@@ -453,7 +470,6 @@ def KDE_no_bp(param, data):
     #calculate Rp
     
     Rp = 0.0
-    '''
     ep_delta=1e-2
     for i in range(dim):
         # achive information about P(v_th,v2) or P(v1,v_th)
@@ -465,14 +481,16 @@ def KDE_no_bp(param, data):
         output_KDE_grad = func_alpha(Grad_)
         output_KDE_hessian = func_alpha(Hessian_)
         #Calate K_i
-        delta_ep=wendland_1_test(ep_delta, data[i], V_reset)
+        delta_ep=wendland_1_test2(ep_delta, data[i], V_reset)
         Sigma=sigma**2/(2*tau_m)*(1-jnp.exp(-2*tau_r/tau_m))
+        '''
+        Integral_scaling = gaussian_integral(jnp.sqrt(Sigma), shift)
+        '''
         K_i=1/jnp.sqrt(2*jnp.pi*Sigma)*(-sigma**2/(2*tau_m**2))*output_KDE_grad[:, i] # normalization need to be calculated
         # calculate integral
-        integral=combine_conv(param["width"],alpha_1, data, param["shifts"], Sigma)
+        integral=combine_conv(param["width"],alpha_1, d, param["shifts"], Sigma)
         output_integral = func_alpha(integral)
-        Rp=Rp+delta_ep*(output_integral[:,1-i]*K_i).sum()
-        '''
+        Rp=Rp+((output_integral[:,1-i]*K_i)*coeff).sum()*Factor_Loss*delta_ep
     return Lp+Rp
     
 '''
@@ -644,8 +662,8 @@ def resample(i):
     key = jax.random.PRNGKey(seeds[i])
     Data_jax = jax.random.uniform(key, minval = Center_O -r, maxval = Center_O + r, shape = ((args.batches, dim)) )
     '''
-    lab1=int(args.batches/4)
-    lab2=int(args.batches/2)
+    lab1=int(args.batches/16)
+    lab2=int(args.batches/8)
     Data_jax=Data_jax.at[0:lab1,1].set(args.V_reset)
     Data_jax=Data_jax.at[lab1:lab2,0].set(args.V_reset)
     '''
@@ -739,7 +757,7 @@ grid_points = np.column_stack([X.ravel(), Y.ravel()])
 
 # 使用已有的vec_KDE函数评估概率密度
 print("评估概率密度...")
-batch_size = 5000
+batch_size = 500
 Z_list = []
 
 # 使用tqdm显示进度、
