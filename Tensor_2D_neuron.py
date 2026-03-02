@@ -30,12 +30,12 @@ parser.add_argument('--Chosen_List', type=list, default= ["gaussian", "gaussian"
 parser.add_argument('--rank', type = dict, default = 128)
 parser.add_argument('--rbf_types', type = str, default = "three_one", help = "three_one/two")
 parser.add_argument('--epochs', type = int, default = 50000)
-parser.add_argument('--batches', type = int, default = 5000)
+parser.add_argument('--batches', type = int, default = 4)
 parser.add_argument('--Train', type = bool, default = True)
 parser.add_argument('--m', type = int, default = 27)
 parser.add_argument('--scale_r', type = float, default = 1.0)
 parser.add_argument('--r_sde', type = float, default = 20)
-parser.add_argument('--I', type = float, default = 0)
+parser.add_argument('--I', type = float, default = 8)
 parser.add_argument('--V_thres', type = float, default = 20)
 parser.add_argument('--tau_r', type = float, default = 0)
 parser.add_argument('--tau_m', type = float, default = 0.02)
@@ -470,7 +470,7 @@ def KDE_no_bp(param, data):
     #calculate Rp
     
     Rp = 0.0
-    ep_delta=1e-2
+    ep_delta=1
     for i in range(dim):
         # achive information about P(v_th,v2) or P(v1,v_th)
         d = data.copy()
@@ -486,11 +486,15 @@ def KDE_no_bp(param, data):
         '''
         Integral_scaling = gaussian_integral(jnp.sqrt(Sigma), shift)
         '''
+        '''
         K_i=1/jnp.sqrt(2*jnp.pi*Sigma)*(-sigma**2/(2*tau_m**2))*output_KDE_grad[:, i] # normalization need to be calculated
         # calculate integral
         integral=combine_conv(param["width"],alpha_1, d, param["shifts"], Sigma)
         output_integral = func_alpha(integral)
-        Rp=Rp+((output_integral[:,1-i]*K_i)*coeff).sum()*Factor_Loss*delta_ep
+        '''
+        K_i=(-sigma**2/(2*tau_m**2))*output_KDE_grad[:, i]
+        output_integral = output_KDE
+        Rp=Rp+((Factor_Loss*output_integral[:,1-i]*K_i)*coeff).sum()*delta_ep
     return Lp+Rp
     
 '''
