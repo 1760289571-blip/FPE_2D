@@ -1,0 +1,750 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsthm, amsmath, amssymb}
+\usepackage{mathrsfs}
+\usepackage{color}
+\usepackage{physics}
+\title{Fokker-Planck equation for neurons}
+\author{2301111573 Zhuoran Li}
+\date{December 2025}
+\graphicspath{{figures/}}
+
+
+\begin{document}
+	\maketitle
+	\section{Outline: from FPE to spectrum}
+    \subsection{Goals}
+	The goal is to calculate the contribution of cross spectrum on the total spectrum of population spike train for neurons that receive partially-shared input.
+	\subsection{Method}
+	According to Winner-Khinchin theorem, the cross spectrum could be regarded as the Fourier transform of cross-correlation function:
+	
+	\begin{equation}
+		S_{12}(\omega)=\int_{-\infty}^{\infty}e^{i\omega t}R_{12}(t)
+	\end{equation}
+	
+	Where $R_{12}(\tau)=<r_1(t)r_2(t+\tau)>$is the cross-correlation function.This amount equals to p(neuron 1 fires at t=$\tau|$neuron 2 fires at t=0) at steady state.
+	
+	In order to calculate $R_{12}(\tau)$, we use the following steps:
+	
+	
+	1. Calculate p($V_1(t=0)|$neuron 2 fires at t=0), which is the voltage distribution of neuron 1 when neuron 2 has just fired. In order to calculate it, We could use Tensor Neural network (TNN) to solve FPE.
+	
+	2. Calculate p(neuron 1 fires at time $t=\tau|V_1(t=0)$), which is an escape rate of OU process for single neuron and already be calculated in our previous work.
+	
+	3. Use the results in step 1 and 2 to calculate $R_{12}(\tau)=<r_1(t)r_2(t+\tau)>$ (Law of Total Probability).
+	
+	\section{Fokker-Planck equation for two neurons}
+
+	
+	\subsection{Model structure}
+	Assume there are two neurons. For $i\in \{1,2\}$. voltage of neuron i evolves according to the following equation:
+	
+	\begin{equation}
+	\tau_m \frac{dv_i}{dt}=-v_i+I(t)+\sigma (\sqrt{1-c}\xi_i(t)+\sqrt{c}\xi_0(t))
+	\end{equation}
+	
+	Where $c$ is shared noise ratio.
+	
+	\subsection{Evaluation of cross-spctrum}
+	
+	\subsubsection{F-P eqn}
+	The corresponding Fokker-Planck equation is:
+	
+	\begin{equation}
+	\partial_tP(v_1,v_2,t)=(\hat{L}+\hat{R})P(v_1,v_2,t)
+	\label{eq:F-P eqn}
+    \end{equation}
+
+    \subsubsection{$\hat{L}$ operator}
+    
+	$\hat{L}$ is subthreshold operator:
+	
+	\begin{equation}
+	\hat{L}=-\partial_{v_1}\frac{-v_1+I(t)}{\tau_m}-\partial_{v_2}\frac{-v_2+I(t)}{\tau_m}+\frac{\sigma^2}{2\tau_m^2}(\partial_{v_1}^2+\partial_{v_2}^2)+c\frac{\sigma^2}{\tau_m^2}\partial_{v_1}\partial_{v_2}
+	\label{eq3: L operator}
+	\end{equation}
+	
+	\subsubsection{$\hat{R}$ operator}
+	$\hat{R}$ is the reset operator, which is complex. We list the key formula of $\hat{R}$ here and leave the detailed calculation process in \textbf{Appendix A}.
+	
+	\begin{equation}
+	\hat{R}P(v_1,v_2,t)=(\hat{R}_1+\hat{R}_2)P(v_1,v_2,t)
+	\label{eq: expression of R}
+	\end{equation}
+	
+	Where $\hat{R}_i$ represents reset operator due to the firing of neuron $i$ ($i \in \{1,2\}$).
+	
+	$\hat{R}_1$ is further decomposed as follows:
+	\begin{equation}
+		\hat{R}_1P(v_1,v_2,t)=\hat{R}_1^{\tau_r}P(v_1,v_2,t-\tau_r)+\int_{\tau_r}^{2\tau_r}\hat{R}_{12}^{\tau}P(v_1,v_2,t-\tau)d\tau
+		\label{eq:decomposition of R}
+	\end{equation}
+	
+	where $\hat{R}_1^{\tau_r}$ is the mass of neuron 1 firing at $t$ and returned to the subthreshold regime at $t+\tau_r$ and  $\hat{R}_{12}^{\tau}d\tau$ is the mass returned at $(t+\tau,t+\tau+d\tau)$ ($\tau \in \{\tau_r,2\tau_r\}$).This two parts are further expressed as follows:
+	
+	\begin{equation}
+		\hat{R}_1^{\tau_r}P(v_1,v_2,t-\tau_r)=\delta(v_1-v_r)exp(\tau_r\hat{L_1}^{ref}(v_{ref},v_2))(-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}P(v_1,v_2,t-\tau_r)|_{v_1=v_{th}})
+		\label{eq: R1 tau}
+	\end{equation}
+	
+	\begin{align}
+		\hat{R}_{12}^{\tau}P(v_1,v_2,t-\tau)&=\delta(v_2-v_r)exp[(\tau-\tau_r)\hat{L_2}^{ref}(v_1,v_{ref})](-\frac{\sigma^2}{2\tau_m^2}\partial_{v_2}\rho_1(v_1,v_2,t-\tau_r)|_{v_2=v_{th}})\\
+		\rho_1(v_1,v_2,t-\tau_r)&=exp[(\tau-\tau_r)\hat{L}_1^{ref}(v_{ref},v_2)](-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}P(v_1,v_2,t-\tau)|_{v_1=v_{th}})
+		\label{R12 tau}
+	\end{align}
+	
+	Where $\hat{L}_1^{ref}(v_{ref},v_2)$ and $\hat{L}_2^{ref}(v_1,v_{ref})$ is the evolution operator when neuron $1$ or $2$ is in refractory period.
+	
+	\begin{align}
+		\hat{L}_1^{ref}=&\partial_{v_2}\frac{v_2+I(t)}{\tau_m}+\frac{\sigma^2}{2\tau_m}\partial_{v_2}^2\\
+		\hat{L}_2^{ref}=&\partial_{v_1}\frac{v_1+I(t)}{\tau_m}+\frac{\sigma^2}{2\tau_m}\partial_{v_1}^2
+	\end{align}
+	
+	Also, $\hat{R}_2$ could be defined as follows:
+	
+	\begin{align}
+		\hat{R}_2P(v_1,v_2,t)&=\hat{R}_2^{\tau_r}P(v_1,v_2,t-\tau_r)+\int_{\tau_r}^{2\tau_r}\hat{R}_{21}^{\tau}P(v_1,v_2,t-\tau)d\tau\\
+		\hat{R}_2^{\tau_r}P(v_1,v_2,t-\tau_r)&=\delta(v_2-v_r)exp(\tau_r\hat{L_2}^{ref}(v_1,v_{ref}))(-\frac{\sigma^2}{2\tau_m^2}\partial_{v_2}P(v_1,v_2,t-\tau_r)|_{v_2=v_{th}})\\
+		\hat{R}_{21}^{\tau}P(v_1,v_2,t-\tau)&=\delta(v_1-v_r)exp[(\tau-\tau_r)\hat{L_1}^{ref}(v_{ref},v_2)](-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}\rho_2(v_1,v_2,t-\tau_r))\\
+		\rho_2(v_1,v_2,t-\tau_r)&=exp[(\tau-\tau_r)\hat{L}_2^{ref}(v_1,v_{ref})](-\frac{\sigma^2}{2\tau_m^2}\partial_{v_2}P(v_1,v_2,t-\tau))
+	\end{align}
+	
+	\subsubsection{steady state}
+	
+	Solve the following equation to calculate steady state $P_0(v_1,v_2)$:
+	
+	\begin{equation}
+		(\hat{L}+\hat{R})P_0(v_1,v_2)=0
+		\label{eq: steady state}
+	\end{equation}
+	
+	With normalization equation:
+	
+	\begin{equation}
+		\int_{-\infty}^{\infty}dv_1\int_{-\infty}^{\infty}dv_2P_0(v_1,v_2)=(1-\tau_rr_1)(1-\tau_rr_2)
+	\end{equation}
+	
+	Where the firing rate of neuron 1 and 2 at steady state  is:
+	
+	\begin{equation}
+		r_i=\hat{R_i}P_0, i\in {1,2}
+	\end{equation}
+	
+	\subsubsection{Solve $\tilde{Q}$}
+	
+	Define:
+	
+	\begin{equation}
+		\tilde{Q}(v_1,v_2,\omega)=\int_0^{\infty}dt e^{-i\omega t}[P(v_1,v_2,t)-P_0(v_1,v_2)]
+	\end{equation}
+	
+	With the initial condition $v_2=v_{th}$ at time 0.
+	
+	Take Fourier transform of eq.\eqref{eq:F-P eqn} and eq.\eqref{eq: steady state}, we could relate $\tilde{Q}$ to $P_0$:
+	
+	\begin{equation}
+		(i\omega-\hat{L}-\hat{R}^*)Q=(\frac{\hat{R}_2^*}{r_0}-1+\frac{\hat{R}^*-\hat{R}}{i\omega})P_0
+		\label{eq: relation between Q an P}
+	\end{equation}
+	
+	Where $\hat{R}^*$ and $\hat{R}_2^{*}$ is defined by:
+	
+    \begin{align}
+    	\hat{R}^*&=\hat{R}_1^*+\hat{R}_2^*\\
+    	\hat{R}_1^*&=e^{-i\omega\tau_r}R_1^{\tau_r}+\int_{\tau_r}^{2\tau_r}e^{-i\omega\tau}R_{12}^{\tau}d\tau\\
+    	\hat{R}_2^*&=e^{-i\omega\tau_r}R_2^{\tau_r}+\int_{\tau_r}^{2\tau_r}e^{-i\omega\tau}R_{21}^{\tau}d\tau
+	\end{align}
+	
+	
+	\subsubsection{Solve $S_{12}(\omega)$}
+	The cross correlation function:
+	\begin{equation}
+		K_{12}(\tau)=<r_1(t+\tau)r_2(t)>=r_0(m_{12}(t)-r_0)
+	\end{equation}	
+	
+	Where $m_{12}(t)=r_1(t)|_{P(v1,t=0)=P(v_1|v_2=v_{th})}$.
+	
+	The cross spectrum:
+	
+	\begin{align}
+	    S_{12}(\omega)&=2r_0Re\int_0^{\infty}dte^{-i\omega t}(m_{12}(t)-r_0)\notag\\
+	    &=2r_0Re(-\int_{-\infty}^{\infty}dv_2\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}\tilde{Q}(v_1,v_2,\omega)|_{v_1=v_{th}})
+	    \label{eq: cross spectrum}
+	\end{align}
+	
+	eqs.\eqref{eq:F-P eqn},\eqref{eq: relation between Q an P},\eqref{eq: cross spectrum} consist of a procedure to solve $S_{12}(\omega)$ from Fokker-Planck equation.
+	
+	\subsection{Numerical solution}
+	
+	In this section we discuss the discretization and numerical solution of the procedure above.
+	
+	Reference: [1].
+	
+	\subsubsection{Discretization and boundary conditions}
+	
+	We approximate the coordinate:
+	
+	\begin{align}
+		v_1&\rightarrow v_1^{(i)}=v_1^{(0)}+i\Delta v\\
+		v_2&\rightarrow v_2^{(j)}=v_2^{(0)}+j\Delta v\\
+		t&\rightarrow t^{(k)}=k\Delta t
+	\end{align}
+	
+	with $i,j \in {0,1,...,N-1}$ and $k \in {0,1,...,\infty}$.Also we discretize $P(v_1,v_2,t^{(k)})$ and $Q(v_1,v_2,t^{(k)})$ tp $\textbf{P}^k$, $\textbf{Q}^k$ with the elements
+	\begin{equation}
+		P(v_1^{(i)},v_2^{(j)},t^{(k)}),Q(v_1^{(i)},v_2^{(j)},t^{(k)})\rightarrow P_{i+jN}^k,Q_{i+jN}^k
+	\end{equation}
+	
+	the linear operator $\hat{L}$ and $\hat{R}$ are regarded as large and sparse matrices of dimension $N^2 \times N^2$, which lead to the FPE:
+	
+	\begin{equation}
+		\frac{\textbf{P}^{k+1}-\textbf{P}^k}{\delta t}=\hat{L}\textbf{P}^k+(\hat{R_1^{\tau_r}}+\hat{R_2^{\tau_r}})\textbf{P}^{k-N_{ref}}+\sum_{n=N_{ref}}^{2N_{ref}}(\hat{R}_{12}^{n\Delta t}+\hat{R}_{21}^{n\Delta t})\textbf{P}^{k-n}\Delta t
+		\label{discretized F-P}
+	\end{equation}
+	
+	Where $\tau_{r}=N_{ref}\delta t$.
+	
+	\subsubsection{Subthreshold dynamics}
+	
+	We approximate the $\hat{L}$ as a matrix with the element: 
+	
+	\begin{align}
+		\hat{L}_{i+jN,m}=-&(\frac{2\sigma^2}{\tau_m^2\Delta v^2})\delta_{i+jN,m}\notag\\
+		+&(\frac{\sigma^2}{2\tau_m^2\Delta v^2}+\frac{-v_1^{(i+1)}+I}{2\tau_m\Delta v})\bar{\delta}_{i,N-1}\delta_{i+1+jN,m}\notag\\
+		+&(\frac{\sigma^2}{2\tau_m^2\Delta v^2}-\frac{-v_1^{(i-1)}+I}{2\tau_m\Delta v})\bar{\delta}_{i,0}\delta_{i-1+jN,m}\notag\\
+		+&(\frac{\sigma^2}{2\tau_m^2\Delta v^2}+\frac{-v_2^{(j+1)}+I}{2\tau_m\Delta v})\bar{\delta}_{j,N-1}\delta_{i+(j+1)N.m}\notag\\
+		+&(\frac{\sigma^2}{2\tau_m^2\Delta v^2}-\frac{-v_2^{(j-1)}+I}{2\tau_m\Delta v})\bar{\delta}_{j,0}\delta_{i+(j-1)N,m}\notag\\
+		+&(\frac{c\sigma^2}{4\tau_m^2\Delta v^2})[\bar{\delta}_{i,0}(\bar{\delta}_{j,0}\delta_{i-1+(j-1)N,m}\notag\\
+		-&\bar{\delta}_{j,N-1}\delta_{i-1+(j+1)N,m})+\bar{\delta}_{i,N-1}(\bar{\delta}_{j,N-1}\delta_{i+1+(j+1)N,m}\notag\\
+		-&\bar{\delta}_{j,0}\delta_{i+1+(j-1)N,m})]
+	\end{align}
+	
+	\subsubsection{resetting dynamics}
+	
+	Accordng to the decomposition in eq.\eqref{discretized F-P}, we need to approximate $\hat{R}_1^{\tau_r}$, $\hat{R}_2^{\tau_r}$, $\hat{R}_{12}^{n\Delta t}$ and $\hat{R}_{21}^{n\Delta t}$.
+	
+	~\\
+	
+	\textbf{Approximation of $\hat{R}_1^{\tau_r}$ and $\hat{R}_2^{\tau_r}$}. We calculate $\hat{R}_1$ first. There are 3 steps:(1)Absorbs the probability that crosses the threshold by $v_1=v_{th}$. (Which is denoted $\hat{F}_1$) (2) evolves the probability during the refractory period of neuron 1 by $\tau_r$.(Which is denoted $\hat{E}_1^{N_{ref}}$) (3) reinsert the probability at $v_1=v_r$ (Which is denoted $\hat{S}_1$) . 
+	
+	\begin{equation}
+     	\hat{R}=\hat{S}_1\hat{E}_1^{N_{ref}}\hat{F}_1
+	\end{equation}
+	
+	the $(N\times N^2)$-dimensional matrix $\hat{F}_1$ extracts the efflux of probability crossing the threshold and put it into refractory state (an $N$-dimensional vector):
+	
+	\begin{equation}
+	 	\hat{F}_{m,i+jN}=\frac{\sigma^2}{2\tau_m^2\Delta v}\delta_{m,j}\delta_{i,N-1}
+	\end{equation}
+	
+	And the $\hat{E}$ is described as:
+	
+	\begin{equation}
+		\hat{E}=(1+\frac{\tau_{ref}}{N_{ref}}\hat{L}_1^{ref})^{N_{ref}}
+	\end{equation}
+	
+	the evolution of $v_2$ could be regarded as an OU process, so the state transfer matrix could be analytically expressed.
+	
+	and the reinsert operator is:
+	
+	\begin{align}
+		\hat{S}_{i'+j'N,m''}=&\frac{\kappa_r\delta_{i'.n_r}+(1-\kappa_r)\delta_{i',n_r+1}}{\Delta v}\delta_{j',m''}\\
+		\kappa_r=&1-((v_r-v_0) mod \Delta_v)\\
+		n_r=&M(v_r-v_0,\Delta v).
+	\end{align}
+	
+	~\\
+	
+	\textbf{Approximation of $\hat{R}_{12}^{n\Delta t}$ and $\hat{R}_{21}^{n\Delta t}$}. This part is a little more complex. We consider $\hat{R}_{12}^{\tau}$ first. There are 5 steps: (1)Absorbs the probability that crosses the threshold by $v_1=v_{th}$. (Which is denoted $\hat{F}_1$) (2) evolves the probability during the refractory period of neuron 1 by time $(n-N_{ref})\Delta t$.(Which is denoted $\hat{E}_1^{n-N_{ref}}$) (3) Extract the probability that cross the threshold by $v_{2}=v_{th}$.  (Which is denoted $\hat{F}_{12}$) (4) evolves the probability during the refractory period of neuron 2 by time  .(Which is denoted $\hat{E_2}^{n-N_{ref}}$) (5)reinsert the probability at $v_2=v_r$ (Which is denoted $\hat{S}_2$).
+	
+	
+	\begin{equation}
+		\hat{R}=\hat{S}_2\hat{E}_2^{n-N_{ref}}\hat{F}_{12}\hat{E}_1^{n-N_{ref}}\hat{F}_1
+	\end{equation}
+	
+	The only thing we need to take care of is the $N \times N$-dimensional $\hat{F}_{12}$. Other operators are like the expressions above.
+	
+	\begin{equation}
+		\hat{F}_{(12)m,j}=\frac{\sigma^2}{2\tau_m^2\Delta v}\delta_{m,n_r}\delta_{j,N-1}
+	\end{equation}
+	
+	~\\
+	
+	\textbf{Analytical expression of $\hat{E}$.} because the subthreshold evolution of $v_1$ and $v_2$ are actually OU process, so the evolution matrix of delay $n\Delta t$ ($\hat{E}^n$) is actually a state transfer matrix for OU process after time $n\Delta t$. The state transfer probability density is:
+	
+	\begin{align}
+		p(v,t+n\Delta t|v_t.t)&=\frac{1}{\sqrt{2\pi \Sigma}}exp(-\frac{(v-\mu)^2}{2\Sigma})\notag\\
+		\mu&=I+(v_t-I)e^{-\frac{n\Delta t}{\tau_m}}\notag\\
+		\Sigma&=\frac{\sigma^2}{2\tau_m}(1-e^{-\frac{2n\Delta t}{\tau_m}})\label{eq: analytical expression of E}
+	\end{align}
+	
+	\section{Using Tensor neural network to solve FPE(Ref.[2])}
+	
+	In this section, we emonstrate how to use TNN to solve FPE.	
+	
+	\subsection{Loss function}
+		
+	The crucial part loss function is (we neglect penalty term first):
+	
+	\begin{equation}
+		Loss=\frac{1}{N}\sum_{i=1}^{N}((\hat{L}+\hat{R})P(\vec{v}^{(i)},\theta))^2
+	\end{equation}
+	
+	Where $N$ is $\#sample$, and $\theta$ represents our parameters.
+	
+	\subsection{Forward Loss Calculation}
+	
+	Since the bakprop  part is computed automatically using JAX package, we only need to calculate forward loss manually.
+	
+	\subsubsection{Calculation of $\hat{L}P$}
+	
+	We calculate using eq. \eqref{eq3: L operator}:
+	
+	\begin{align}
+	\hat{L}P=&-\partial_{v_1}(\frac{-v_1+I(t)}{\tau_m}P)-\partial_{v_2}(\frac{-v_2+I(t)}{\tau_m}P)+\frac{\sigma^2}{2\tau_m^2}(\partial_{v_1}^2P+\partial_{v_2}^2P)+c\frac{\sigma^2}{\tau_m^2}\partial_{v_1}\partial_{v_2}P\notag\\
+	=&\frac{2}{\tau_m}P-\frac{-v_1+I(t)}{\tau_m}(\partial_{v_1}P)-\frac{-v_2+I(t)}{\tau_m}(\partial_{v_2}P)+\frac{\sigma^2}{2\tau_m}(\partial_{v_1}^2P+\partial_{v_2}^2P)+c\frac{\sigma^2}{\tau_m^2}\partial_{v_1}\partial_{v_2}P
+    \end{align}
+
+	
+	\subsubsection{Calculation of $\hat{R}P$}
+	
+	When calculating $\hat{R}P$, the key formula is \eqref{eq: R1 tau}. We need to address the singularity of $Dirac-\delta$ function and the exponential $exp(\tau_r \hat{L_1}^{ref}(v_{ref},v_2))$.
+	
+	~\\
+	
+	\textbf{Approximation of $\delta$ function.} We use a Wendland function to approximate $\delta$ function:
+	\begin{equation}
+	\delta_\epsilon(x)=\frac{5}{4\epsilon}(1-\frac{\abs{x}}{\epsilon})^3_+(3\frac{\abs{x}}{\epsilon}+1)
+	\end{equation}
+	
+
+	\textbf{Analytical expression of $exp(\tau_r \hat{L_1}^{ref}(v_{ref},v_2))$.} We use the conclusion of \eqref{eq: analytical expression of E} as follows (remember that it's actually a operator rather an a closed-form expression):
+
+	\begin{align}
+		exp(\tau_r \hat{L_1}^{ref}(v_{ref},v_2))(\phi)(v)=&\int_{\Omega}\frac{1}{\sqrt{2\pi\Sigma}}exp(-\frac{(v-\mu(v'))^2}{2\Sigma})\phi(v') dv'\notag\\
+	\mu(v')=&I+(v'-I)e^{-\tau_r/\tau_m}\notag\\
+	\Sigma=&\frac{\sigma^2}{2\tau_m}(1-e^{\frac{2\tau_r}{\tau_m}})	
+	\label{eq: analytical expression of exp L}
+	\end{align}
+	
+	\subsubsection{Address the non-local problem}
+	
+	For the calculation of $\hat{L}P$, we only need to use the value and first, second-order derivative of the function $P$, which is easy in RBF-based TNN. But in the calculation of $\hat{R}P$, we need to calculate (using eq. \eqref{eq: analytical expression of exp L} and eq. \eqref{eq: R1 tau}):
+	
+	\begin{align}
+	&\int_{\Omega}\frac{1}{\sqrt{2\pi\Sigma}}exp(-\frac{(v-I-(v'-I)e^{-\tau_r/\tau_m})^2}{2\Sigma})(-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}P(v_1,v')|_{v_1=v_{th}}) dv'
+	\label{eq. RP}
+	\end{align}
+	
+	Now we expand this formula:
+	
+	\begin{align}
+		eq.\eqref{eq. RP}=&\sum_{i=1}^NK_i\sum_{l=1}^ma_{i2}^{(l)}\int_{\Omega}exp(-\frac{(b_1(v)+b_2v')^2}{2\Sigma})k_{i2}^{(l)}(\abs{\frac{v'-s_{i2}^{(l)}}{h_{i2}^{(l)}}})dv'\notag\\
+		K_i=&\frac{1}{Z(\Theta)}\frac{1}{\sqrt{2\pi\Sigma}}(-\frac{\sigma^2}{2\tau_m^2})[\sum_{l=1}^ma_{i1}^{(l)}\partial_{v_1}k_{i1}^{(l)}(\abs{\frac{v_1-s_{i1}^{(l)}}{h_{i1}^{(l)}}})|_{v_1=v_{th}}]\notag\\
+		b_1(v)=&v-I(1-e^{-\tau_r/\tau_m})\notag\\
+		b_2=&-e^{-\tau_r/\tau_m}
+	\end{align}	
+	
+	So we need to calculate the integral inside.
+	
+	~\\
+	
+	\textbf{gaussian kernel.}
+	\begin{equation}
+		\begin{aligned}
+			I
+			&=\int_{-r}^{r}
+			\exp\!\left(
+			-\frac{(b_1+b_2 v')^2}{2\Sigma}
+			-\frac{(v'-s)^2}{h^2}
+			\right)\,dv' \\[6pt]
+	&=	\frac{\sqrt{\pi}}{2\Lambda}
+	\exp\!\left(
+	-\frac{\left(s-\frac{b_1 h^2}{2\sigma}\right)^2}{h^2}
+	\right)
+	\Bigg[
+	\operatorname{erf}\!\left(
+	\frac{
+		r\!\left(\frac{1}{h^2}+\frac{b_2^2}{2\sigma}\right)
+		-\frac{b_2}{2\sigma}\!\left(b_1-\frac{2\sigma s}{h^2}\right)
+	}{\Lambda}
+	\right)
+	+
+	\operatorname{erf}\!\left(
+	\frac{
+		r\!\left(\frac{1}{h^2}+\frac{b_2^2}{2\sigma}\right)
+		+\frac{b_2}{2\sigma}\!\left(b_1-\frac{2\sigma s}{h^2}\right)
+	}{\Lambda}
+	\right)
+	\Bigg]\\
+	\Lambda&= \sqrt{\frac{1}{h^2}+\frac{b_2^2}{2\sigma}}
+\end{aligned}
+\end{equation}
+	
+	
+	\textbf{Inverse Quadratic.}
+	
+	\begin{align}
+	\int_{-r}^r\frac{exp(-\frac{(bv_1+b_2v')^2}{2\Sigma})}{(h^2+(v'-s)^2)^{5/2}}dv'
+    \end{align}
+    
+    This integral cannot be calculated analytically. But in Ref.[2], the author only use wendland function for training. So we neglect this problem now.
+     
+    \textbf{Wendland.}
+
+	\begin{align}
+	I=\int_{-r}^rexp(-\frac{(b_1+b_2v')^2}{2\Sigma})(1-\abs{\frac{v'-s}{h}})^3_+(3\abs{\frac{v'-s}{h}}+1)dv'
+    \end{align}
+
+	\begin{equation}
+		\begin{aligned}
+			I
+			&=
+			A_0
+			\big[
+			\erf(z_+)-\erf(z_-)
+			\big]
+			+
+			A_1
+			\big[
+			e^{-z_+^2}-e^{-z_-^2}
+			\big]
+			\\[4pt]
+			&\quad+
+			A_2
+			\big[
+			z_+ e^{-z_+^2}-z_- e^{-z_-^2}
+			\big],
+		\end{aligned}
+	\end{equation}
+	
+	\[
+	z_\pm=\frac{b_1+b_2 s\pm b_2 h}{\sqrt{2\Sigma}},
+	\qquad
+	\mu=b_1+b_2 s,
+	\]
+	
+	\[
+	\begin{aligned}
+		A_0 &=
+		\sqrt{\frac{\pi\Sigma}{2}}
+		\left(
+		1-\frac{3\Sigma}{b_2^2 h^2}
+		\right),\\
+		A_1 &=
+		\frac{\Sigma}{b_2}
+		\left(
+		\frac{6}{h^2}-\frac{3\mu^2}{\Sigma h^4}
+		\right),\\
+		A_2 &=
+		\frac{6\Sigma^{3/2}}{b_2^2 h^3}.
+	\end{aligned}
+	\]
+	
+	
+\begin{align}
+	&(3 e^{- \frac{b_1^2}{2\sigma} - \frac{b_2 (h+s) b_1}{\sigma}
+		- \frac{b_2^2 (h+s)^2}{2\sigma}}
+	(h+s)
+	\Big(
+	\frac{\sigma}{b_2^4}
+	\big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	+ \frac{9 b_2^2 s}{h^2}
+	+ \frac{6 b_2^2 s^2}{h^3}
+	+ \frac{3 b_1 b_2}{h^2}
+	+ \frac{4 b_1 b_2 s}{h^3}
+	\big)
+	+ \frac{3\sigma^2}{b_2^4 h^3}
+	\Big)
+	)/h
+	\\[4pt]
+	&\quad
+	+ \frac{\sqrt{\pi}\,
+		erfi\!\left(\sqrt{-\frac{1}{2\sigma}}(b_1+b_2(h+s))\right)}
+	{2\sqrt{-\frac{1}{2\sigma}}}
+	\Big(
+	\frac{1}{b_2}
+	+ \frac{3 b_1}{b_2^2 h}
+	+ \frac{3 s}{b_2 h}
+	+ \frac{3\sigma}{b_2^3 h^2}
+	+ \frac{3 b_1^2}{b_2^3 h^2}
+	+ \frac{b_1^3}{b_2^4 h^3}
+	\\
+	&\qquad
+	+ \frac{3 s^2}{b_2 h^2}
+	+ \frac{s^3}{b_2 h^3}
+	+ \frac{3 b_1 s^2}{b_2^2 h^3}
+	+ \frac{3 b_1^2 s}{b_2^3 h^3}
+	+ \frac{6 b_1 s}{b_2^2 h^2}
+	+ \frac{3 b_1 \sigma}{b_2^4 h^3}
+	+ \frac{3 s\sigma}{b_2^3 h^3}
+	\Big)
+	\\[6pt]
+	&\quad
+	+ (3 e^{- \frac{b_1^2}{2\sigma} + \frac{b_2(h-s)b_1}{\sigma}
+		- \frac{b_2^2(h-s)^2}{2\sigma}}
+	(h-s)
+	\Big(
+	\frac{\sigma}{b_2^4}
+	\big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	- \frac{9 b_2^2 s}{h^2}
+	+ \frac{6 b_2^2 s^2}{h^3}
+	- \frac{3 b_1 b_2}{h^2}
+	+ \frac{4 b_1 b_2 s}{h^3}
+	\big)
+	+ \frac{3\sigma^2}{b_2^4 h^3}
+	\Big)
+	)/h
+	\\[6pt]
+	&\quad
+	+ \frac{\sigma^2 e^{- \frac{b_1^2}{2\sigma} + \frac{b_2(h-s)b_1}{\sigma}
+			- \frac{b_2^2(h-s)^2}{2\sigma}}}{b_2^4}
+	\Big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	- \frac{6 b_2^2 s}{h^2}
+	+ \frac{3 b_2^2 s^2}{h^3}
+	- \frac{3 b_1 b_2}{h^2}
+	+ \frac{3 b_1 b_2 s}{h^3}
+	+ \frac{2}{h^3}
+	\Big)
+	\\[6pt]
+	&\quad
+	+ \frac{\sigma^2 e^{- \frac{b_1^2}{2\sigma} - \frac{b_2(h+s)b_1}{\sigma}
+			- \frac{b_2^2(h+s)^2}{2\sigma}}}{b_2^4}
+	\Big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	+ \frac{6 b_2^2 s}{h^2}
+	+ \frac{3 b_2^2 s^2}{h^3}
+	+ \frac{3 b_1 b_2}{h^2}
+	+ \frac{3 b_1 b_2 s}{h^3}
+	+ \frac{2}{h^3}
+	\Big)
+\end{align}
+
+\begin{align}
+	&(3 e^{-z_+^2}
+	(h+s)
+	\Big(
+	\frac{\sigma}{b_2^4}
+	\big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	+ \frac{9 b_2^2 s}{h^2}
+	+ \frac{6 b_2^2 s^2}{h^3}
+	+ \frac{3 b_1 b_2}{h^2}
+	+ \frac{4 b_1 b_2 s}{h^3}
+	\big)
+	+ \frac{3\sigma^2}{b_2^4 h^3}
+	\Big)
+	)/h
+	\\[4pt]
+		&\quad
+	+ \frac{\sqrt{2\pi\sigma
+			}erf(z_+)}
+	{2}
+	\Big(
+	\frac{1}{b_2}
+	+ \frac{3 b_1}{b_2^2 h}
+	+ \frac{3 s}{b_2 h}
+	+ \frac{3\sigma}{b_2^3 h^2}
+	+ \frac{3 b_1^2}{b_2^3 h^2}
+	+ \frac{b_1^3}{b_2^4 h^3}
+	\\
+	&\qquad
+	+ \frac{3 s^2}{b_2 h^2}
+	+ \frac{s^3}{b_2 h^3}
+	+ \frac{3 b_1 s^2}{b_2^2 h^3}
+	+ \frac{3 b_1^2 s}{b_2^3 h^3}
+	+ \frac{6 b_1 s}{b_2^2 h^2}
+	+ \frac{3 b_1 \sigma}{b_2^4 h^3}
+	+ \frac{3 s\sigma}{b_2^3 h^3}
+	\Big)
+	\\[6pt]
+		&\quad
+	+ (3 e^{-z_-^2}
+	(h-s)
+	\Big(
+	\frac{\sigma}{b_2^4}
+	\big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	- \frac{9 b_2^2 s}{h^2}
+	+ \frac{6 b_2^2 s^2}{h^3}
+	- \frac{3 b_1 b_2}{h^2}
+	+ \frac{4 b_1 b_2 s}{h^3}
+	\big)
+	+ \frac{3\sigma^2}{b_2^4 h^3}
+	\Big)
+	)/h
+	\\[6pt]
+		&\quad
+	+ \frac{\sigma^2 e^{-z_-^2}}{b_2^4}
+	\Big(
+	\frac{3 b_2^2}{h}
+	+ \frac{b_1^2}{h^3}
+	- \frac{6 b_2^2 s}{h^2}
+	+ \frac{3 b_2^2 s^2}{h^3}
+	- \frac{3 b_1 b_2}{h^2}
+	+ \frac{3 b_1 b_2 s}{h^3}
+	+ \frac{2}{h^3}
+	\Big)
+	\\[6pt]
+	&\quad
+	+ \frac{\sigma^2 e^{-z_+^2}}{b_2^4}
+		\Big(
+		\frac{3 b_2^2}{h}
+		+ \frac{b_1^2}{h^3}
+		+ \frac{6 b_2^2 s}{h^2}
+		+ \frac{3 b_2^2 s^2}{h^3}
+		+ \frac{3 b_1 b_2}{h^2}
+		+ \frac{3 b_1 b_2 s}{h^3}
+		+ \frac{2}{h^3}
+		\Big)
+\end{align}
+
+\section{FPE for 4D (conductance-based)}
+	\subsection{Model structure}
+Assume there are two neurons, the voltage of which evolves according to the following eqn:
+
+\begin{equation}
+	\tau_m \dot{v_i}=-v_i+\mu^{ex}+\sigma^{ex}(\sqrt{c}\xi^{ex}_0+\sqrt{1-c}\xi_{i}^{ex})+{g_i}
+\end{equation}
+
+Where $\mu^{ex}$ and $\sigma^{ex}$ are the mean and std deviration of external noise and c is shared noise ratio. $g_i$ is conductance of neuron i that evolve according to the following equation: 
+
+\begin{equation}
+	\tau_{EE}\dot{g_{i}}=-g_i+S^{EE}[\mu^{ffd}p^{EE}+\sigma^{ffd}\sqrt{p^{EE}}(\sqrt{p^{EE}}\xi^{ffd}_0+\sqrt{1-p^{EE}}\xi^{ffd}_i)]
+\end{equation}
+
+Where $\mu^{ffd}$ and $\sigma^{ffd}$ are the mean and std deviration of ffd input and $p^{EE}$ is projection probability.
+
+\subsection{F-P eqn}
+The corresponding Fokker-Planck equation is:
+
+\begin{equation}
+	\partial_tP(\vec{v},\vec{g},t)=(\hat{L}+\hat{R})P(\vec{v},\vec{g},t)
+\end{equation}
+
+\subsubsection{$\hat{L}$ operator}
+
+$\hat{L}$ is subthreshold operator:
+
+\begin{align}
+	\hat{L}&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\\
+	Drift&=-(\sum_{i=1}^{2}\partial_{v_i}\frac{-v_i+\mu^{ex}+g_i}{\tau_m}+\sum_{i=1}^{2}\partial_{g_i}\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}})\\
+	Diffusion_{Diagonal}&=\sum_{i=1}^{2}\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_i}^2+\sum_{i=1}^{2}\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g_i}^2\\
+	Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}+\frac{(\sigma^{ex})^2}{\tau_m^2}c\partial_{v_1}\partial_{v_2}
+\end{align}
+
+We could calculate the factor $\hat{L}P$:
+
+\begin{align}
+	\hat{LP}&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\\
+	Drift&=(\frac{2}{\tau_m}+\frac{2}{\tau_{EE}})P-\sum_{i=1}^2\frac{-v_i+\mu^{ex}+g_i}{\tau_m}(\partial_{v_i}P)-\sum_{i=1}^2\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}}(\partial_{g_i}P)\\
+	Diffusion_{Diagonal}&=\frac{(\sigma^{ex})^2}{2\tau_m^2}\sum_{i=1}^{2}\partial_{v_i}^2P+\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\sum_{i=1}^{2}\partial_{g_i}^2P\\
+	Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}P+\frac{(\sigma^{ex})^2}{\tau_m^2}c\partial_{v_1}\partial_{v_2}P
+\end{align}
+
+\subsubsection{$\hat{R}$ operator}
+$\hat{R}$ is the reset operator, which is complex. We list the key formula of $\hat{R}$ here and leave the detailed calculation process in \textbf{Appendix A}.
+
+\begin{equation}
+	\hat{R}P(\vec{v},t)=\sum_{i=1}^{2}\hat{R}_iP(\vec{v},t)
+\end{equation}
+
+Where $\hat{R}_i$ represents reset operator due to the firing of neuron $i$:
+
+\begin{equation}
+	\hat{R}_1P(\vec{v},\vec{g},t-\tau_r)=\delta(v_1-v_r)exp(\tau_r\hat{L_1}^{ref}(v_{ref},v_2,\vec{g}))(-\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_1}P(\vec{v},\vec{g},t-\tau_r)|_{v_1=v_{th}})
+\end{equation}
+
+Where $\hat{L}_1^{ref}(v_{ref},v_2,\vec{g})$ is the evolution operator when neuron $1$ or $2$ is in refractory period.
+
+\begin{align}
+    \hat{L}_1^{ref}(v_{ref},v_2,\vec{g})&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\\
+	Drift&=-(\partial_{v_2}\frac{-v_2+\mu^{ex}+g_2}{\tau_m}+\sum_{i=1}^{2}\partial_{g_i}\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}})\\
+	Diffusion_{Diagonal}&=\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_2}^2+\sum_{i=1}^{2}\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g_i}^2\\
+	Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}
+\end{align}
+
+	\section{Appendix A: Calculation of reset operator $\hat{R}$}
+	
+	Now we explain the detail of the calculation of operator $\hat{R}$.
+		
+	\subsection{partition of state}
+	
+	For convenience, The partition of system states is described in Fig. \eqref{fig:f1.png}.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.8\textwidth]{f1} % 宽度设为文本宽度的80%
+		\caption{the partition of state}
+		\label{fig:f1.png} % 标签，用于交叉引用
+	\end{figure}
+	
+	\textbf{State 1}: neuron 1 and 2 are both in subthreshold regime. The evolution of this state is described by $\hat{L}$ (see \textbf{section 1}). 
+	
+	\textbf{State 2}: neuron 1 is in refractory period and neuron 2 is in subthreshold regime. The evolution of this state is described by $\hat{L}_1$ (see \textbf{section 1}). 
+	
+	\textbf{State 3}: neuron 2 is in refractory period and neuron 1 is in subthreshold regime. The evolution of this state is described by $\hat{L}_2$ (see \textbf{section 1}). 
+	
+	\textbf{State 4}: neuron 1 and 2 are both in refractory period. The evolution of this state is identity matrix $\textbf{I}$.
+	
+	\subsection{Intuition of decomposition of $\hat{R}$}
+	
+	We just see how $\hat{R}_1$ is decomposed.
+	
+	At $t$, there is some mass of neuron 1 firing (from state1 to state2),we called this part of mass $m_1$.
+	
+	A part of  $m_1$ would return to state 1 at $t+\tau_r$ due to the end of refractory period of neuron1. This part is delayed by $\tau_r$ and described by $\hat{R}_1^{\tau_r}$.
+	
+	But in state 2, $v_2$ is still evolving. And neuron 2 fires with non-zero probability within $(t,t+\tau_r)$. 
+	
+	Consider the mass in which neuron2 fires at $t+t'$($t'=\tau-\tau_r\in[0,\tau_r]$). This part of mass will evolve as follows and described by $\hat{R}_{12}^{\tau}$ with delay $\tau$:
+	
+	At $t$: jump from state 1 to state 2.
+	
+	In $(t,t+t')$: in state 2 and thus evolve with $\hat{L}_1^{ref}$.
+	
+	In $(t+t',t+\tau_r)$: in state 4 and thus evolve according to $\textbf{I}$.
+	
+	In $(t+\tau_r,t+\tau)$: in state 3 and thus evolve according to $\hat{L_2^{ref}}$.
+	
+	At $t+\tau$: return to state 1.
+	
+	\textbf{Rmk}: Actually, in $(t+\tau_r,t+\tau)$, in this mass of probability, neuron 1 will have another spike with non-zero probability, but it means that the ISI for neuron 1 is less than $2\tau_r$, which is almost impossible for a regime with not-so-high firing rate. Also this consideration leads to more complexity. So we just neglect this part and do a normalization on $\hat{R}_{12}^{\tau}$ to meet the constraint of conservation.
+	
+	\subsection{Expression of $\hat{R}_{1}^{\tau_r}$ and $\hat{R}_{12}^{\tau}$}
+	
+	We consider $\hat{R}_1$. At $(t,t+dt)$ the firing flux of neuron 1 is:
+	\begin{equation}
+		J_1(v_2,t)dt=-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}P(v_1,v_2,t)|_{v_1=v_{th}}dt
+	\end{equation}
+	
+	The relation of which to the firing rate of neuron 1 is:
+	
+	\begin{equation}
+		r_1(t)=\int_{-\infty}^{\infty}dv_2J_1(v_2,t)
+	\end{equation}
+	
+	Now we consider this amount of mass $J_1(v_2,t)dt$ and see what happens.
+	
+	The calculation of $\hat{R}_1^{\tau_r}$ is the same as eq. (19) in [1] and directly lead to eq. \eqref{eq: R1 tau}.
+	
+	The calculation of $\hat{R}_{12}^{\tau}$ is a little harder. First, the amount of neuron that neuron1 fires at $(t,t+dt)$ and neuron 2 fires at $(t+\tau-\tau_r,t+\tau-\tau_r+d\tau)$ is:
+	\begin{equation}
+		\hat{R}_{12}^{\tau}P(v_1,v_2,t-\tau)=\delta(v_1-v_r)exp((\tau-\tau_r)\hat{L}_1^{ref}(v_ref,v_2))(-\frac{\sigma^2}{2\tau_m^2}\partial_{v_1}P(v_1,v_2,t-\tau)|_{v_1=v_{th}})
+	\end{equation}
+	
+	And this leads to eq. \eqref{R12 tau}.
+
+
+
+\end{document} 
