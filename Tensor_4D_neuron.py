@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+9# -*- coding: utf-8 -*-
 """
 Created on Sun Feb  1 18:55:28 2026
 
@@ -35,8 +35,8 @@ parser.add_argument('--Train', type = bool, default = True)
 parser.add_argument('--m', type = int, default = 27)
 parser.add_argument('--scale_r', type = float, default = 1.0)
 parser.add_argument('--r_sde', type = float, default = 20)
-parser.add_argument('--mu_ex', type = float, default = 8)
-parser.add_argument('--mu_ffd', type = float, default = 8)
+parser.add_argument('--mu_ex', type = float, default = 0)
+parser.add_argument('--mu_ffd', type = float, default = 0)
 parser.add_argument('--V_thres', type = float, default = 20)
 parser.add_argument('--tau_r', type = float, default = 0)
 parser.add_argument('--tau_m', type = float, default = 0.02)
@@ -67,11 +67,12 @@ Center_O = jnp.array([0,  0,  0, 0])
 need to be modified for our version
 '''
 
+#DEBUG：not add data[2] and data[3]
 func_into = (lambda data,mu_ex,mu_ffd,tau_m,tau_ee,p_ee,s_ee: jnp.asarray(
         [(-data[0]+mu_ex+data[2])/tau_m,  
          (-data[1]+mu_ex+data[3])/tau_m,
          (-data[2]+s_ee*mu_ffd*p_ee)/tau_ee,
-         (-data[3]+s_ee*mu_ffd*p_ee)/tau_ee,
+         (-data[3]+s_ee*mu_ffd*p_ee)/tau_ee
         ]
     )
     )
@@ -469,7 +470,7 @@ def KDE_no_bp(param, data):
         
     #calculate diffusion term (non-diagonal term)
     KDE_derivative_v = ((output_KDE_grad[:,0:2]).prod(axis = -1)) * (output_KDE[:, 2:].prod(axis = -1)) * Factor_Loss
-    KDE_derivative_g = ((output_KDE_grad[:,3:]).prod(axis = -1)) * (output_KDE[:, 0:2].prod(axis = -1)) * Factor_Loss
+    KDE_derivative_g = ((output_KDE_grad[:,2:]).prod(axis = -1)) * (output_KDE[:, 0:2].prod(axis = -1)) * Factor_Loss
     
     Lp = c*jnp.square(sigma_ex/tau_m) *  ( ( KDE_derivative_v * coeff )).sum()   + Lp
     Lp = jnp.square(sigma_ffd*s_ee*p_ee/tau_ee) *  ( ( KDE_derivative_g * coeff )).sum()   + Lp
@@ -477,8 +478,9 @@ def KDE_no_bp(param, data):
     #calculate Rp
     
     Rp = 0.0
+    
     ep_delta=1
-    for i in range(dim):
+    for i in [0,1]:
         List_choose = list(set(range(dim)) - set([i]))
         # achive information about P(v_th,v2) or P(v1,v_th)
         d = data.copy()
@@ -491,6 +493,7 @@ def KDE_no_bp(param, data):
         #Calate K_i
         delta_ep=wendland_1_test2(ep_delta, data[i], V_reset)
         Sigma=sigma_ex**2/(2*tau_m)*(1-jnp.exp(-2*tau_r/tau_m))
+    
         '''
         Integral_scaling = gaussian_integral(jnp.sqrt(Sigma), shift)
         '''
@@ -500,6 +503,7 @@ def KDE_no_bp(param, data):
         integral=combine_conv(param["width"],alpha_1, d, param["shifts"], Sigma)
         output_integral = func_alpha(integral)
         '''
+    
         K_i=(-sigma_ex**2/(2*tau_m**2))*output_KDE_grad[:, i]
         output_integral = output_KDE
         Rp=Rp+((Factor_Loss*(output_integral[:,List_choose]).prod(axis = -1)*K_i)*coeff).sum()*delta_ep
