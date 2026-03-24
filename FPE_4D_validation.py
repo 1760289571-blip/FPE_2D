@@ -55,8 +55,8 @@ def simulate(params):
 
         v1 += ((-v1 + params.mu_ex + g1) / params.tau_m) * params.dt + dv_noise_1
         v2 += ((-v2 + params.mu_ex + g2) / params.tau_m) * params.dt + dv_noise_2
-        g1 += ((-g1 + params.s_ee * params.mu_ffd * params.p_ee) / params.tau_ee) * params.dt + sigma_g * dg_noise_1
-        g2 += ((-g2 + params.s_ee * params.mu_ffd * params.p_ee) / params.tau_ee) * params.dt + sigma_g * dg_noise_2
+        g1 += ((-g1 + params.s_ee * params.mu_ffd * params.p_ee) / params.tau_ee) * params.dt + dg_noise_1
+        g2 += ((-g2 + params.s_ee * params.mu_ffd * params.p_ee) / params.tau_ee) * params.dt + dg_noise_2
 
         # Instantaneous reset when threshold is crossed (tau_r = 0)
         v1[v1 >= params.v_thres] = params.v_reset
@@ -75,6 +75,8 @@ def simulate(params):
 def make_plots(samples, params):
     g1_is_zero=abs(samples[:,2]) <= 1
     g2_is_zero=abs(samples[:,3]) <= 1
+    v1_is_zero=abs(samples[:,0]) <= 1
+    v2_is_zero=abs(samples[:,1]) <= 1
     g_is_zero=np.logical_and(g1_is_zero,g2_is_zero)
     v1 = samples[g_is_zero, 0]
     v2 = samples[g_is_zero, 1]
@@ -118,11 +120,11 @@ def build_argparser():
     p.add_argument('--n_traj', type=int, default=4000)
     p.add_argument('--seed', type=int, default=123)
 
-    p.add_argument('--mu_ex', type=float, default=8.0)
+    p.add_argument('--mu_ex', type=float, default=5)
     p.add_argument('--mu_ffd', type=float, default=0)
     p.add_argument('--tau_m', type=float, default=0.02)
     p.add_argument('--tau_ee', type=float, default=0.004)
-    p.add_argument('--sigma_ex', type=float, default=2.0)
+    p.add_argument('--sigma_ex', type=float, default=2)
     p.add_argument('--sigma_ffd', type=float, default=0.8)
     p.add_argument('--c', type=float, default=0.5)
     p.add_argument('--p_ee', type=float, default=0.2)
