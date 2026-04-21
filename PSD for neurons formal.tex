@@ -1,0 +1,325 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsthm, amsmath, amssymb}
+\usepackage{mathrsfs}
+\usepackage{color}
+\usepackage{physics}
+\title{PSD for neurons (formal)}
+\author{2301111573 Zhuoran Li}
+\date{April 2026}
+\graphicspath{{figures/}}
+
+\begin{document}
+	\maketitle
+	\section{Outline: from FPE to spectrum}
+	\subsection{Goals}
+	The goal is to:
+	
+	1. calculate PSD of population spike train for neurons that receive partially-shared input.
+	
+	2. calculate the comtribution of cross spectrum on the total spectrum of population spike train for neurons that receive partially-shared input.
+	
+	\subsection{Method}
+	
+	For N interchangeable neurons that receive partially-2nd-order-shared input, the PSD is defined by:
+	
+	\begin{align}
+		\tilde{r}(\omega)&=\int_{-\infty}^{\infty}r(t)e^{-i\omega t}dt\notag\\
+		S(\omega)&=\lim\limits_{T\rightarrow \infty}\frac{1}{T}\mathbb{E}[|\tilde{r}(\omega)|^2]
+	\end{align}
+	
+	and it could be decomposed by:
+	
+	\begin{equation}
+	    S(\omega)=NS_{self}(\omega)+N(N-1)S_{cross}(\omega)
+	\end{equation}
+	
+	So we could achieve our goals through calculating $S_{self}(\omega)$ and $S_{cross}(\omega)$.
+	
+	\subsection{Model structure}
+	As the simplest model, we assume a system with 2 conduction-based neurons that receive external and feedforward input:
+	
+	
+	\begin{equation}
+		\tau_m \dot{v_i}=-v_i+\mu^{ex}+\sigma^{ex}(\sqrt{c}\xi^{ex}_0+\sqrt{1-c}\xi_{i}^{ex})+{g_i}
+	\end{equation}
+	
+	Where $\mu^{ex}$ and $\sigma^{ex}$ are the mean and std deviration of external noise and c is shared noise ratio. $g_i$ is conductance of neuron i that evolve according to the following equation: 
+	
+	\begin{equation}
+		\tau_{EE}\dot{g_{i}}=-g_i+S^{EE}[\mu^{ffd}p^{EE}+\sigma^{ffd}\sqrt{p^{EE}}(\sqrt{p^{EE}}\xi^{ffd}_0+\sqrt{1-p^{EE}}\xi^{ffd}_i)]
+	\end{equation}
+	
+	Where $\mu^{ffd}$ and $\sigma^{ffd}$ are the mean and std deviration of ffd input and $p^{EE}$ is projection probability.$\xi_0^{ex}$ and $\xi_0^{ffd}$ are shared noise in neuron 1 and 2 in v and g dimension.
+	
+	\subsection{Workflow}
+	
+	According to (Sebastian Vellmer et Benjamin Lindner, 2019), we could calculate $S^{self}(\omega)$ and $S^{cross}(\omega)$ according to the following steps:
+	
+	\textbf{step1: calculation of $S^{self}(\omega)$}
+	
+	(1) calculate steady state probability $P_0^{self}$.
+	
+	(2) calculate firing rate for steady state $r_0$.
+	
+	(3) For some given $\omega$, calculate deviations of the probability density $\tilde{Q}^{self}(\omega)$.
+	
+	(4) Calculate $S_{self}(\omega)$.
+	
+	\textbf{step2: calculation of $S^{cross}(\omega)$}
+	
+	(1) calculate steady state probability $P_0^{cross}$.
+	
+	(2) calculate firing rate for steady state $r_0$.
+	
+	(3) For some given $\omega$, calculate deviations of the probability density $\tilde{Q}^{cross}_{21}(\omega)$.
+	
+	(4) Calculate $S_{21}^{cross}(\omega)$.
+	
+	\section{Calculation of $S^{self}(\omega)$}
+	\subsection{calculate steady state probability $P_0^{self}$}
+	Because this part is for the calculation of self spectrum, we only need to assume a system with 1 conduction-based neuron that receive external and feedforward input:
+	
+	
+	\begin{align}
+		\tau_m \dot{v}=&-v+\mu^{ex}+\sigma^{ex}\xi^{ex}+{g}\notag\\
+		\tau_{EE}\dot{g}=&-g+S^{EE}[\mu^{ffd}p^{EE}+\sigma^{ffd}\sqrt{p^{EE}}\xi^{ffd}]
+		\label{Langevin 2D}
+	\end{align}
+	
+	The corresponding FPE for this system is:
+	\begin{align}
+		\partial_tP(v,g,t)=(\hat{L}+\hat{R})P(v,g,t)
+		\label{2D FPE}
+	\end{align}
+	
+	Where
+	\begin{align}
+		\hat{L}&=Drift + Diffusion\notag\\
+		Drift&=-(\partial_{v}\frac{-v+\mu^{ex}+g}{\tau_m}+\partial_{g}\frac{-g+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}})\notag\\
+		Diffusion&=\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v}^2+\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g}^2
+	\end{align}
+	
+	~\\
+	
+	\begin{align}
+		\hat{R}P(v,g,t-\tau_r)=&\delta(v-v_r)exp(\tau_r\hat{L}^{ref}(v_{ref}, g))(-\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v}P(v,g,t-\tau_r)|_{v=v_{th}})\notag\\
+		\hat{L}_1^{ref}(v_{ref},g)=&-\partial_{g}\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}} + \frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g}^2
+		\label{R 2D FPE}
+	\end{align}
+	
+	\textbf{Method}: Use TNN to solve $P_0$ according to the equation $(\hat{L}+\hat{R})P_0=0$ and eqs. \eqref{2D FPE}-\eqref{R 2D FPE} and get $P_0$.
+	
+	\textbf{TNN form}:
+	\begin{align} P_0(v,g)&=\frac{1}{Z(\Theta)}\sum_{i=1}^{N}c_i\prod_{j\in\{v,a\}}k_{ij}(j;\Theta_{ij})\\
+	k_{ij}(x_j,\Theta_{ij})&=\sum_{l=1}^m\alpha_{ij}^{(l)}k_{ij}^{(l)}(|\frac{x_j-s_{ij}^{(l)}}{h_{ij}^{(l)}}|),\alpha_{ij}^{(l)}\geq 0,\sum_{l=1}^m\alpha_{ij}^{(l)}=1
+	\end{align}
+	
+	(if we assume that the kernel $k_{ij}(j,\Theta_{ij})$ is normalized, then $Z(\Theta)=\sum_{i=1}^{N}c_i$)
+	
+	\textbf{Loss function}:=$(\hat{L}+\hat{R})P_0+penalty \quad term$.
+	
+	\textbf{Validation}: Simulate Langevin eqn eq. \eqref{Langevin 2D} to get emperical distribution, and compare it with theoretical distribution using KL and DS divergence.
+	
+	\subsection{calculate firing rate for steady state $r_0$}\label{sec:r_0}
+	
+	\begin{equation}
+		r_0=-\int_{-\infty}^{\infty}dg\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v}P_0(v,g)|_{v=v_{th}}
+		\label{r_0 2D}
+	\end{equation}
+
+	\textbf{Method}: Use the result of $P_0$ and eq. \eqref{r_0 2D} to directly calculate $r_0$.
+	
+	\begin{align}
+		r_0=&-\frac{(\sigma^{ex})^2}{2\tau_m^2}\frac{1}{Z(\Theta)}\sum_{i=1}^{N}c_i\int_{-\infty}^{\infty}da(\partial_{v}\prod_{j\in\{v,a\}}k_{ij}(j;\Theta_{ij}))|_{v=v_{th}}\notag\\
+		=&-\frac{(\sigma^{ex})^2}{2\tau_m^2}\frac{1}{Z(\Theta)}\sum_{i=1}^{N}c_i[\int_{-\infty}^{\infty}dgk_{ig}(g;\Theta_{ig})][\partial_{v}k_{iv}(v;\Theta_{iv})]|_{v=v_{th}}\notag\\
+     	=&-\frac{(\sigma^{ex})^2}{2\tau_m^2}\frac{1}{Z(\Theta)}\sum_{i=1}^{N}c_i[\partial_{v}k_{iv}(v;\Theta_{iv})]|_{v=v_{th}}
+	\end{align}
+	
+	(if we assume that the kernel $k_{ij}(j,\Theta_{ij})$ is normalized)
+	
+	\textbf{Validation}: Simulate Langevin eqn eq. \eqref{Langevin 2D} to get emperical firing rate, and compare it with theoretical firing rate directly.
+	\subsection{For some given $\omega$, calculate deviations of the probability density $\tilde{Q}^{self}(\omega)$}
+	
+	\begin{equation}
+		(i\omega+\hat{L}+e_\tau\hat{R})\tilde{Q}^{self}(\omega)=[1+(\frac{e_\tau-1}{i\omega}-\frac{e_\tau}{r_0})\hat{R}]P_0
+		\label{Q 2D}
+	\end{equation}
+	
+	let $\hat{Q}=U+iV$, where $U$,$V$ are real functions. eq. \eqref{Q 2D} could be written by:
+	
+	\begin{equation}
+		(\hat{L}+cos(\omega\tau_{ref})\hat{R})U-(\omega+sin(\omega\tau_{ref})\hat{R})V=[1+(\frac{sin(\omega\tau_f)}{\omega}-\frac{cos(\omega\tau_f)}{r_0})\hat{R}]P_0
+		\label{real Q}
+	\end{equation}
+	\begin{equation}
+		(\hat{L}+cos(\omega\tau_{ref})\hat{R})V+(\omega+sin(\omega\tau_{ref})\hat{R})U=[(\frac{1-cos(\omega\tau_f)}{\omega}-\frac{sin(\omega\tau_f)}{r_0})\hat{R}]P_0
+		\label{image Q}
+    \end{equation}
+	
+		\textbf{Method}: For each $\omega$, use TNN, the result of $P_0$ and eq. \eqref{Q 2D} to calculate $\tilde{Q}^{self}$. Fit $U$ and $V$ simutaneously. 
+		
+	\textbf{TNN form}:
+	\begin{align} U(v,g,\omega)&=\sum_{i=1}^{N}c_i^{(U)}\prod_{j\in\{v,g\}}k_{ij}^{(U)}(j;\Theta_{ij}^{(U)})\notag\\
+	V(v,g,\omega)&=\sum_{i=1}^{N}c_i^{(V)}\prod_{j\in\{v,g\}}k_{ij}^{(V)}(j;\Theta_{ij}^{V})
+	\end{align}
+	
+	\textbf{Loss function}=[\eqref{real Q}r.h.s.-\eqref{real Q}l.h.s.]$^2$+[\eqref{image Q}r.h.s-\eqref{image Q}l.h.s]$^2$+penalty.
+	
+	\textbf{Validation}: Validate $S^{self}(\omega)$.
+	
+	\subsection{Calculate $S^{self}(\omega)$}
+	\begin{equation}
+		S^{self}(\omega)=r_0(1-2Re\int_{-\infty}^{\infty}dg\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_v\tilde{Q}(v,g,\omega)|_{v=v_{th}})		
+		\label{S self}
+	\end{equation}
+	
+	\textbf{Method}: Use the result of $\tilde{Q}^{self}(\omega)$ and eq. \eqref{S self} to calculate $S^{self}(\omega)$.
+	
+	\begin{align}
+		S^{self}(\omega)=&r_0(1-2\int_{-\infty}^{\infty}dg\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_v[\sum_{i=1}^{N}c_i^{(U)}\prod_{j\in\{v,a\}}k_{ij}^{(U)}(j;\Theta_{ij}^{(U)})]|_{v=v_{th}})\notag\\
+		=&r_0(1-\frac{(\sigma^{ex})^2}{\tau_m^2}\sum_{i=1}^{N}c_i^{(U)}[\partial_vk_{iv}^{(U)}(v;\Theta_{iv}^{(U)})]|_{v=v_{th}})
+	\end{align}
+	
+	\textbf{Validation}: Simulate Langevin eqn eq. \eqref{Langevin 2D}, calculate spectrum and compare it with theoretical PSD directly.(total shape, slope in different freq)
+	
+	\section{Calculation of $S^{cross}(\omega)$}
+	
+	\subsection{calculate steady state probability $P_0^{cross}$}
+
+	We need the full model to calculate cross spectrum($i\in\{1,2\}$):
+	
+	\begin{align}
+		\tau_m \dot{v_i}=&-v_i+\mu^{ex}+\sigma^{ex}(\sqrt{c}\xi^{ex}_0+\sqrt{1-c}\xi_{i}^{ex})+{g_i}\notag\\
+		\tau_{EE}\dot{g_{i}}=&-g_i+S^{EE}[\mu^{ffd}p^{EE}+\sigma^{ffd}\sqrt{p^{EE}}(\sqrt{p^{EE}}\xi^{ffd}_0+\sqrt{1-p^{EE}}\xi^{ffd}_i)]
+		\label{Langevin 4D}
+	\end{align}
+	
+	The corresponding Fokker-Planck equation is:
+	
+	\begin{equation}
+		\partial_tP(\vec{v},\vec{g},t)=(\hat{L}+\hat{R})P(\vec{v},\vec{g},t)
+		\label{4D FPE}
+	\end{equation}
+	
+	Where $\hat{L}$ is: 
+	
+	\begin{align}
+		\hat{L}&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\notag\\
+		Drift&=-(\sum_{i=1}^{2}\partial_{v_i}\frac{-v_i+\mu^{ex}+g_i}{\tau_m}+\sum_{i=1}^{2}\partial_{g_i}\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}})\notag\\
+		Diffusion_{Diagonal}&=\sum_{i=1}^{2}\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_i}^2+\sum_{i=1}^{2}\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g_i}^2\notag\\
+		Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}+\frac{(\sigma^{ex})^2}{\tau_m^2}c\partial_{v_1}\partial_{v_2}
+	\end{align}
+	
+	We could calculate the factor $\hat{L}P$:
+	
+	\begin{align}
+		\hat{LP}&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\notag\\
+		Drift&=(\frac{2}{\tau_m}+\frac{2}{\tau_{EE}})P-\sum_{i=1}^2\frac{-v_i+\mu^{ex}+g_i}{\tau_m}(\partial_{v_i}P)-\sum_{i=1}^2\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}}(\partial_{g_i}P)\notag\\
+		Diffusion_{Diagonal}&=\frac{(\sigma^{ex})^2}{2\tau_m^2}\sum_{i=1}^{2}\partial_{v_i}^2P+\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\sum_{i=1}^{2}\partial_{g_i}^2P\notag\\
+		Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}P+\frac{(\sigma^{ex})^2}{\tau_m^2}c\partial_{v_1}\partial_{v_2}P
+	\end{align}
+	
+	and $\hat{R}$ is:
+	
+	\begin{equation}
+		\hat{R}P(\vec{v},t)=\sum_{i=1}^{2}\hat{R}_iP(\vec{v},t)
+	\end{equation}
+	
+	Where $\hat{R}_i$ represents reset operator due to the firing of neuron $i$:
+	
+	\begin{equation}
+		\hat{R}_1P(\vec{v},\vec{g},t-\tau_r)=\delta(v_1-v_r)exp(\tau_r\hat{L_1}^{ref}(v_{ref},v_2,\vec{g}))(-\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_1}P(\vec{v},\vec{g},t-\tau_r)|_{v_1=v_{th}})
+	\end{equation}
+	
+	Where $\hat{L}_1^{ref}(v_{ref},v_2,\vec{g})$ is the evolution operator when neuron $1$ or $2$ is in refractory period.
+	
+	\begin{align}
+		\hat{L}_1^{ref}(v_{ref},v_2,\vec{g})&=Drift + Diffusion_{Diagonal}+Diffusion_{cross}\notag\\
+		Drift&=-(\partial_{v_2}\frac{-v_2+\mu^{ex}+g_2}{\tau_m}+\sum_{i=1}^{2}\partial_{g_i}\frac{-g_i+S^{EE}\mu^{ffd}p^{EE}}{\tau_{EE}})\notag\\
+		Diffusion_{Diagonal}&=\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_2}^2+\sum_{i=1}^{2}\frac{(S^{EE}\sigma^{ffd})^2p^{EE}}{2\tau_{EE}^2}\partial_{g_i}^2\notag\\
+		Diffusion_{cross}&=\frac{(S^{EE}\sigma^{ffd})^2(p^{EE})^2}{\tau_{EE}^2}\partial_{g_1}\partial_{g_2}
+		\label{L1 4D FPE}
+	\end{align}
+	
+	\textbf{Method}: Use TNN to solve $P_0$ according to the equation $(\hat{L}+\hat{R})P_0=0$ and eqs. \eqref{4D FPE}-\eqref{L1 4D FPE} and get $P_0$.
+	
+	\textbf{TNN form}:
+	\begin{align} P_0(\vec{v},\vec{g})&=\frac{1}{Z(\Theta)}\sum_{i=1}^{N}c_i\prod_{j\in\{v_1,v_2,g_1,g_2\}}k_{ij}(j;\Theta_{ij})\\
+		k_{ij}(x_j,\Theta_{ij})&=\sum_{l=1}^m\alpha_{ij}^{(l)}k_{ij}^{(l)}(|\frac{x_j-s_{ij}^{(l)}}{h_{ij}^{(l)}}|),\alpha_{ij}^{(l)}\geq 0,\sum_{l=1}^m\alpha_{ij}^{(l)}=1
+	\end{align}
+	
+	(if we assume that the kernel $k_{ij}(j,\Theta_{ij})$ is normalized, then $Z(\Theta)=\sum_{i=1}^{N}c_i$)
+	
+	\textbf{Loss function}:=$(\hat{L}+\hat{R})P_0+penalty \quad term$.
+	
+	\textbf{Validation}: Simulate Langevin eqn eq. \eqref{Langevin 4D} to get emperical distribution, and compare it with theoretical distribution using KL and DS divergence.
+		
+	\subsection{calculate firing rate for steady state $r_0$}
+	
+	\textbf{Method}: the $r_0$ for each neuron is the same as Section \ref{sec:r_0}.
+	
+	\subsection{For some given $\omega$, calculate deviations of the probability density $\tilde{Q}^{cross}(\omega)$}
+	
+	The cross correlation function is:
+	
+	\begin{equation}
+	C_{cross}(t)=r_0[m_{cross}(t)-r_0]
+	\end{equation}
+	
+	where $m_cross(t)$ is the firing rate of neuron 1 conditioined on a spike of neuron 2 at $t=0$.
+	
+	So we could define the deviation:
+	
+	\begin{equation}
+		\tilde{Q}^{(2)}(\vec{v},\vec{g},\omega)=\int_{0}^{\infty}dte^{i\omega t}[P^{(2)}(\vec{v},\vec{g},t)-P_0]
+	\end{equation}
+	
+	Where $P^{(2)}(z,t)$ is the prob density conditioned on a spike of neuron 2 at t=0.
+	
+	We could solve $\tilde{Q}$ by the following equation:
+	
+	\begin{equation}
+	(i\omega+\hat{L}+e_\tau\hat{R_1}+e_\tau\hat{R_2})\tilde{Q}^{(2)}(\omega)=[1+(\frac{e_\tau-1}{i\omega}-\frac{e_\tau}{r_0})\hat{R_2}]P_0
+	\label{Q 4D}
+    \end{equation}
+    
+    let $\hat{Q}=U+iV$, where $U$,$V$ are real functions. eq. \eqref{Q 4D} could be written by:
+    
+    \begin{equation}
+    	(\hat{L}+cos(\omega\tau_{ref})(\hat{R_1}+\hat{R_2}))U-(\omega+sin(\omega\tau_{ref})(\hat{R_1}+\hat{R_2}))V=[1+(\frac{sin(\omega\tau_f)}{\omega}-\frac{cos(\omega\tau_f)}{r_0})\hat{R_2}]P_0
+    	\label{real Q 4D}
+    \end{equation}
+    \begin{equation}
+    	(\hat{L}+cos(\omega\tau_{ref})(\hat{R_1}+\hat{R_2}))V+(\omega+sin(\omega\tau_{ref})(\hat{R_1}+\hat{R_2}))U=[(\frac{1-cos(\omega\tau_f)}{\omega}-\frac{sin(\omega\tau_f)}{r_0})\hat{R_2}]P_0
+    	\label{image Q 4D}
+    \end{equation}
+        \textbf{Method}: For each $\omega$, use TNN, the result of $P_0$ and eq. \eqref{Q 4D} to calculate $\tilde{Q}^{cross}$. Fit $U$ and $V$ simutaneously. 
+    
+    \textbf{TNN form}:
+    \begin{align} 		        U(\vec{v},\vec{g},\omega)&=\sum_{i=1}^{N}c_i^{(U)}\prod_{j\in\{v_1,v_2,g_1,g_2\}}k_{ij}^{(U)}(j;\Theta_{ij}^{(U)})\notag\\
+		V(\vec{v},\vec{g},\omega)&=\sum_{i=1}^{N}c_i^{(V)}\prod_{j\in\{v_1,v_2,g_1,g_2\}}k_{ij}^{(V)}(j;\Theta_{ij}^{V})
+	\end{align}
+    
+    \textbf{Loss function}=[\eqref{real Q 4D}r.h.s.-\eqref{real Q 4D}l.h.s.]$^2$+[\eqref{image Q 4D}r.h.s-\eqref{image Q 4D}l.h.s]$^2$+penalty.
+    
+    \textbf{Validation}: Validate $S^{cross}(\omega)$.
+    
+	\subsection{Calculate $S_{cross}(\omega)$}
+		\begin{equation}
+		S^{cross}(\omega)=-2r_0Re\int_{-\infty}^{\infty}dg_1\int_{-\infty}^{\infty}dg_2\int_{-\infty}^{\infty}dv_2\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_{v_1}\tilde{Q}^{(2)}(\vec{v},\vec{g},\omega)|_{v=v_{th}})	
+		\label{S cross}
+	\end{equation}
+	
+	\textbf{Method}: Use the result of $\tilde{Q}^{(2)}(\omega)$ and eq. \eqref{S cross} to calculate $S^{cross}(\omega)$.
+	
+	\begin{align}
+		S^{cross}(\omega)=&-2r_0\int_{-\infty}^{\infty}dg_1\int_{-\infty}^{\infty}dg_2\int_{-\infty}^{\infty}dv_2\frac{(\sigma^{ex})^2}{2\tau_m^2}\partial_v[\sum_{i=1}^{N}c_i^{(U)}\prod_{j\in\{v,a\}}k_{ij}^{(U)}(j;\Theta_{ij}^{(U)})]|_{v=v_{th}}\notag\\
+		=&-r_0\frac{(\sigma^{ex})^2}{\tau_m^2}\sum_{i=1}^{N}c_i^{(U)}[\partial_{v_1}k_{iv_1}^{(U)}(v_1;\Theta_{iv_1}^{(U)})]|_{v_1=v_{th}}
+	\end{align}
+	
+	\textbf{Validation}: Simulate Langevin eqn eq. \eqref{Langevin 4D}, calculate overall spectrum $S(\omega)$, use $S^{cross}(\omega)=(S(\omega)-S^{self}(\omega))/2$ to calculate $S^{cross}(\omega)$ and compare it with theoretical PSD directly (total shape, slope in different freq).
+	
+	
+\end{document}
