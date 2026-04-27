@@ -26,7 +26,7 @@ import sys
 parser = argparse.ArgumentParser(description='TRBFN Training for FKP Equaions')
 
 parser.add_argument('--test_case', type=str, default="FPE")
-parser.add_argument('--Chosen_List', type=list, default= ["wendland", "truncated_gaussian","truncated_gaussian"])
+parser.add_argument('--Chosen_List', type=list, default= ["truncated_gaussian", "truncated_gaussian","truncated_gaussian"])
 parser.add_argument('--rank', type = dict, default = 1024)
 parser.add_argument('--rbf_types', type = str, default = "three_one", help = "three_one/two")
 parser.add_argument('--epochs', type = int, default = 50000)
@@ -47,7 +47,10 @@ parser.add_argument('--sigma_ffd', type = float, default = 0.8)
 parser.add_argument('--c', type = float, default = 0.5)
 parser.add_argument('--p_ee', type = float, default = 0.2)
 parser.add_argument('--s_ee', type = float, default = 1)
-
+parser.add_argument('--save_density_data', type=bool, default=True)
+parser.add_argument('--density_data_name', type=str, default='nn_density_2d.npz')
+parser.add_argument('--steady_state_summary_name', type=str, default='steady_state_summary_2d.npz')
+parser.add_argument('--firing_rate_num_g', type=int, default=4001)
 args = parser.parse_args()
 
 '''
@@ -780,6 +783,33 @@ def relative_error_high_prob(prob_area, test_points, vec_dens_accurate, param, e
     error_data_frame = df_describe_error.describe(percentiles = error_description)
     return error_data_frame
 
+
+def kde_pdf_and_grad_single(param, data):
+    alpha_1 = jnp.square(param['alpha_1']) / (jnp.square(param['alpha_1'])).sum(axis=0)
+    alpha_2 = jnp.square(param['alpha_2']) / (jnp.square(param['alpha_2'])).sum(axis=0)
+    coeff = jnp.square(param["coeff"]) / (jnp.square(param["coeff"])).sum()
+
+    kde_eval, grad_eval, _ = combine_k_no_bp(param["width"], alpha_1, data, param["shifts"])
+    func_alpha = lambda yi: (alpha_2 * yi).sum(axis=0)
+    output_kde = func_alpha(kde_eval)
+    output_grad = func_alpha(grad_eval)
+
+    density = ((coeff * (output_kde[:, 0] * output_kde[:, 1])).sum()) * Factor_Loss
+    grad_v = ((coeff * (output_grad[:, 0] * output_kde[:, 1])).sum()) * Factor_Loss
+    return density, grad_v
+
+
+vec_kde_pdf_and_grad = jit(vmap(kde_pdf_and_grad_single, in_axes=(None, 0), out_axes=(0, 0)))
+
+
+def compute_theoretical_firing_rate(param, g_min, g_max, num_g):
+    g_grid = np.linspace(g_min, g_max, num_g)
+    query = np.column_stack((np.full_like(g_grid, V_thres), g_grid))
+    density_vth, grad_v_vth = vec_kde_pdf_and_grad(param, query)
+    prefactor = - (sigma_ex ** 2) / (2 * (tau_m ** 2))
+    r0 = prefactor * np.trapezoid(np.asarray(grad_v_vth), g_grid)
+    return g_grid, np.asarray(density_vth), np.asarray(grad_v_vth), float(r0)
+
 Prob = [0.01, 0.05, 0.1]
 
 Loss_Range = range(args.epochs)
@@ -848,13 +878,47 @@ plt.savefig(Save_Path + 'Distribution')
 
 
 # 保存神经网络估计得到的概率密度数据，供后续validation比较
-'''
-nn_density_save_path = "nn_density.npz"
+if args.save_density_data:
+    nn_density_save_path = os.path.join(Save_Path, args.density_data_name)
+    np.savez_compressed(
+        nn_density_save_path,
+        density=np.array(Z_normalized),
+        x=np.array(x),
+        y=np.array(y),
+        meta={
+            "mu_ex": args.mu_ex,
+            "mu_ffd": args.mu_ffd,
+            "tau_m": args.tau_m,
+            "tau_ee": args.tau_ee,
+            "p_ee": args.p_ee,
+            "s_ee": args.s_ee,
+            "sigma_ex": args.sigma_ex,
+            "sigma_ffd": args.sigma_ffd,
+            "c": args.c,
+            "grid_size": grid_size,
+            "r_plot_x": r_plot1,
+            "r_plot_y": r_plot2,
+        },
+    )
+    print(f"神经网络概率密度已保存到: {nn_density_save_path}")
+
+g_grid, density_vth, grad_v_vth, r0_theory = compute_theoretical_firing_rate(
+    Final_Param,
+    g_min=-r_plot2,
+    g_max=r_plot2,
+    num_g=args.firing_rate_num_g,
+)
+print(f"Theoretical steady-state firing rate r0 (from P0): {r0_theory:.8e}")
+
+steady_state_summary_path = os.path.join(Save_Path, args.steady_state_summary_name)
 np.savez_compressed(
-    nn_density_save_path,
-    density=np.array(Z_normalized),
-    x=np.array(x),
-    y=np.array(y),
+    steady_state_summary_path,
+    theoretical_r0=r0_theory,
+    v_threshold=V_thres,
+    g_grid=g_grid,
+    p_vth_g=density_vth,
+    dpdv_vth_g=grad_v_vth,
+    density_path=os.path.join(Save_Path, args.density_data_name),
     meta={
         "mu_ex": args.mu_ex,
         "mu_ffd": args.mu_ffd,
@@ -865,10 +929,9 @@ np.savez_compressed(
         "sigma_ex": args.sigma_ex,
         "sigma_ffd": args.sigma_ffd,
         "c": args.c,
-        "grid_size": grid_size,
-        "r_plot_x": r_plot1,
-        "r_plot_y": r_plot2,
+        "r0_integral_g_min": -r_plot2,
+        "r0_integral_g_max": r_plot2,
+        "r0_integral_num_g": args.firing_rate_num_g,
     },
 )
-print(f"神经网络概率密度已保存到: {nn_density_save_path}")
-'''
+print(f"Steady-state summary (for Section 2.2/2.3) saved to: {steady_state_summary_path}")

@@ -32,7 +32,7 @@ parser.add_argument('--rbf_types', type = str, default = "three_one", help = "th
 parser.add_argument('--epochs', type = int, default = 50000)
 parser.add_argument('--batches', type = int, default = 1024)
 parser.add_argument('--Train', type = bool, default = True)
-parser.add_argument('--m', type = int, default = 27)
+parser.add_argument('--m', type = int, default = 9)
 parser.add_argument('--scale_r', type = float, default = 1.0)
 parser.add_argument('--r_sde', type = float, default = 20)
 parser.add_argument('--mu_ex', type = float, default = 8)
@@ -52,16 +52,18 @@ parser.add_argument('--density_data_name', type=str, default='nn_density_2d.npz'
 parser.add_argument('--steady_state_summary_name', type=str, default='steady_state_summary_2d.npz')
 parser.add_argument('--firing_rate_num_g', type=int, default=4001)
 parser.add_argument('--task_mode', type=str, default='q_omega', choices=['p0', 'q_omega'])
-parser.add_argument('--omega', type=float, default=10.0)
+parser.add_argument('--omega', type=float, default=1000.0)
 parser.add_argument('--q_epochs', type=int, default=20000)
 parser.add_argument('--q_batches', type=int, default=5000)
 parser.add_argument('--q_lr', type=float, default=2e-4)
 parser.add_argument('--q_reg_bound', type=float, default=1e3)
 parser.add_argument('--q_reg_param', type=float, default=1e4)
-parser.add_argument('--p0_param_path', type=str, default='')
+parser.add_argument('--p0_param_path', type=str, default= './experiment/example1/FPE__rk1024_r20.0_m_use9rbf_typesthree_one_klttt/Param.pkl')
 parser.add_argument('--p0_summary_path', type=str, default='')
 parser.add_argument('--q_param_name', type=str, default='Q_params.pkl')
 parser.add_argument('--q_data_name', type=str, default='Q_omega_data.npz')
+parser.add_argument('--q_plot_name', type=str, default='Q_omega_real_imag.png')
+parser.add_argument('--psd_summary_name', type=str, default='PSD_self_omega_summary.npz')
 args = parser.parse_args()
 
 '''
@@ -932,6 +934,16 @@ def compute_theoretical_firing_rate(param, g_min, g_max, num_g):
     return g_grid, np.asarray(density_vth), np.asarray(grad_v_vth), float(r0)
 
 
+def compute_theoretical_self_psd_from_q(q_param_u, r0, g_min, g_max, num_g):
+    g_grid = np.linspace(g_min, g_max, num_g)
+    query = np.column_stack((np.full_like(g_grid, V_thres), g_grid))
+    _, grad_v_vth = vec_kde_pdf_and_grad(q_param_u, query)
+    prefactor = (sigma_ex ** 2) / (2 * (tau_m ** 2))
+    integral_real = prefactor * np.trapezoid(np.asarray(grad_v_vth), g_grid)
+    s_self = r0 * (1.0 - 2.0 * integral_real)
+    return g_grid, np.asarray(grad_v_vth), float(integral_real), float(s_self)
+
+
 def run_section_2_3_q_solver(p0_param, save_dir):
     summary_path = args.p0_summary_path if args.p0_summary_path else os.path.join(save_dir, args.steady_state_summary_name)
     if os.path.exists(summary_path):
@@ -1008,7 +1020,7 @@ def run_section_2_3_q_solver(p0_param, save_dir):
     with open(q_param_path, "wb") as f:
         pickle.dump(init_uv, f)
 
-    grid_size_q = 120
+    grid_size_q = 50
     xv = np.linspace(-20.0, 20.0, grid_size_q)
     gv = np.linspace(-10.0, 10.0, grid_size_q)
     Xq, Gq = np.meshgrid(xv, gv)
@@ -1017,6 +1029,32 @@ def run_section_2_3_q_solver(p0_param, save_dir):
     v_eval = vec_KDE_q(init_uv["V"], q_points).reshape(Xq.shape) / Factor_Loss
 
     q_data_path = os.path.join(save_dir, args.q_data_name)
+
+    g_psd, du_vth, psd_integral_real, s_self_omega = compute_theoretical_self_psd_from_q(
+        init_uv["U"], r0, g_min=-10.0, g_max=10.0, num_g=args.firing_rate_num_g
+    )
+    psd_summary_path = os.path.join(save_dir, args.psd_summary_name)
+    np.savez_compressed(
+        psd_summary_path,
+        omega=omega,
+        theoretical_r0=r0,
+        psd_integral_real=psd_integral_real,
+        s_self_omega=s_self_omega,
+        g_grid=g_psd,
+        dUdv_vth_g=du_vth,
+        q_param_path=q_param_path,
+        q_data_path=q_data_path,
+        meta={
+            "sigma_ex": sigma_ex,
+            "tau_m": tau_m,
+            "v_threshold": V_thres,
+            "formula": "S_self(omega)=r0*(1-2*Re[int dg (sigma_ex^2/(2*tau_m^2))*d_v Q(v_th,g,omega)])",
+            "g_min": -10.0,
+            "g_max": 10.0,
+            "num_g": args.firing_rate_num_g,
+        },
+    )
+
     np.savez_compressed(
         q_data_path,
         omega=omega,
@@ -1028,11 +1066,46 @@ def run_section_2_3_q_solver(p0_param, save_dir):
         losses=np.array(q_losses),
         p0_summary_path=summary_path,
         p0_param_path=args.p0_param_path if args.p0_param_path else save_path_param,
+        psd_integral_real=psd_integral_real,
+        s_self_omega=s_self_omega,
+        dUdv_vth_g=du_vth,
+        g_psd_grid=g_psd,
     )
     print(f"Section 2.3 Q(omega) parameters saved to: {q_param_path}")
     print(f"Section 2.3 Q(omega) grid data saved to: {q_data_path}")
+    print(f"Section 2.4 self-PSD summary saved to: {psd_summary_path}")
+    print("s(omega={}):{}".format(omega,s_self_omega))
 
+    fig_q, axes_q = plt.subplots(1, 2, figsize=(13, 5))
+    im_r = axes_q[0].imshow(
+        u_eval,
+        extent=[xv.min(), xv.max(), gv.min(), gv.max()],
+        origin='lower',
+        aspect='auto',
+        cmap='coolwarm',
+    )
+    axes_q[0].set_title(f"Re(Q(v,g,ω)), ω={omega:.4g}")
+    axes_q[0].set_xlabel("v")
+    axes_q[0].set_ylabel("g")
+    fig_q.colorbar(im_r, ax=axes_q[0], fraction=0.046, pad=0.04)
 
+    im_i = axes_q[1].imshow(
+        v_eval,
+        extent=[xv.min(), xv.max(), gv.min(), gv.max()],
+        origin='lower',
+        aspect='auto',
+        cmap='coolwarm',
+    )
+    axes_q[1].set_title(f"Im(Q(v,g,ω)), ω={omega:.4g}")
+    axes_q[1].set_xlabel("v")
+    axes_q[1].set_ylabel("g")
+    fig_q.colorbar(im_i, ax=axes_q[1], fraction=0.046, pad=0.04)
+
+    fig_q.tight_layout()
+    q_plot_path = os.path.join(save_dir, args.q_plot_name)
+    fig_q.savefig(q_plot_path, dpi=180)
+    plt.close(fig_q)
+    print(f"Section 2.3 Q(omega) visualization saved to: {q_plot_path}")
 if args.task_mode == "q_omega":
    p0_param_source = args.p0_param_path if args.p0_param_path else save_path_param
    if not os.path.exists(p0_param_source):
