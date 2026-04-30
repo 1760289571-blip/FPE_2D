@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsthm, amsmath, amssymb}
+\usepackage{mathrsfs}
+\usepackage{color}
+\usepackage{physics}
+\title{p/ap dependency in oscillator}
+\author{2301111573 Zhuoran Li}
+\date{April 2026}
+\graphicspath{{figures/}}
+
+\begin{document}
+	\maketitle
+	Consider the following system with output x(t):
+	\section{Oscillator structure}
+	\begin{align}
+		dx&=vdt\notag\\
+		dv&=(-2\gamma v-\omega_0^2x)dt+Ae^{u}dW_t\notag\\
+		du&=-\lambda udt+\sigma_ue^{\alpha u}dB_t
+	\end{align}
+	\section{your task}
+	Give Matlab code to: 
+	
+	1. Simulate this system at a set of baseline parameter: $\omega_0=20\pi$,$\gamma=5$,$A=4$,$\lambda=0.5$,$\sigma_u=0.4$,$\alpha=0.4$. Simulation duration $T=200s$, step length $dt=10^{-4}s$.
+	
+	2. Calculate PSD of $x(t)$, fit oscillation frequency and slope of aperiodic part. Show result in figure.
+	
+	3. Simulate system for $\omega_0=2\pi f_0$ with $f_0=5:1:30Hz$, show me how the oscillation frequency / oscillation strength / slope of aperiodic part change when $\omega_0$ change.
+	  
+	4. Simulate system for $A=1:1:10$, show me how the oscillation frequency / oscillation strength / slope of aperiodic part change when $A$ change.
+	
+	5. Simulate system for $\alpha=0:0.1:0.8$, show me how the oscillation frequency / oscillation strength / slope of aperiodic part change when $\alpha$ change.
+	
+	
+	
+\end{document}
